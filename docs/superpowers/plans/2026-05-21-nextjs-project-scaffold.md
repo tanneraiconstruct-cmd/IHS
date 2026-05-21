@@ -4,9 +4,9 @@
 
 **Goal:** Scaffold a buildable, tested, CI-wired Next.js + TypeScript application as the foundation for the IHS construction scheduling tool.
 
-**Architecture:** Next.js 15 (App Router) + TypeScript + Tailwind CSS, all source under `src/`. Vitest runs unit tests. A GitHub Actions workflow runs lint + typecheck + test + build on every push to `main` and every pull request. The repo is left structured so the pure CPM engine (Phase 1) and Supabase integration (later plans) drop in without restructuring.
+**Architecture:** Next.js 16 (App Router) + TypeScript + Tailwind CSS, all source under `src/`. Vitest runs unit tests. A GitHub Actions workflow runs lint + typecheck + test + build on every push to `main` and every pull request. The repo is left structured so the pure CPM engine (Phase 1) and Supabase integration (later plans) drop in without restructuring.
 
-**Tech Stack:** Next.js 15, React 19, TypeScript 5, Tailwind CSS 4, Vitest, ESLint, GitHub Actions, Vercel.
+**Tech Stack:** Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Vitest, ESLint, GitHub Actions, Vercel.
 
 **Repo context:** Git is already initialized; `origin` is `https://github.com/tanneraiconstruct-cmd/IHS.git`; `gh` CLI is authenticated as `tanneraiconstruct-cmd`. `main` already has two commits (a stub README and the planning spec).
 
