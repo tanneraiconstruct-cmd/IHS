@@ -1043,7 +1043,7 @@ create trigger activities_external_progress_guard
 revoke execute on function
   current_company_type(), is_member(uuid), role_on(uuid),
   has_capability(text, uuid, boolean), is_responsible(uuid)
-  from public;
+  from public, anon;
 grant execute on function
   current_company_type(), is_member(uuid), role_on(uuid),
   has_capability(text, uuid, boolean), is_responsible(uuid)
