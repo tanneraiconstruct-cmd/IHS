@@ -72,7 +72,6 @@ create table memberships (
   created_at timestamptz not null default now(),
   unique (user_id, project_id)
 );
-create index idx_memberships_user_project on memberships(user_id, project_id);
 
 -- calendars ---------------------------------------------------------------
 create table calendars (
