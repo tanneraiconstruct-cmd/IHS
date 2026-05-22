@@ -1035,6 +1035,19 @@ create policy role_capabilities_select on role_capabilities for select to authen
 create trigger activities_external_progress_guard
   before update on activities
   for each row execute function enforce_external_progress_only();
+
+-- Restrict the SECURITY DEFINER helper functions. They are internal RLS
+-- plumbing, not client API. RLS policy expressions require the querying
+-- role to hold EXECUTE, so authenticated must keep it (policies above call
+-- these); revoking from public removes the unauthenticated RPC surface.
+revoke execute on function
+  current_company_type(), is_member(uuid), role_on(uuid),
+  has_capability(text, uuid, boolean), is_responsible(uuid)
+  from public;
+grant execute on function
+  current_company_type(), is_member(uuid), role_on(uuid),
+  has_capability(text, uuid, boolean), is_responsible(uuid)
+  to authenticated;
 ```
 
 - [ ] **Step 3: Push the migration**
