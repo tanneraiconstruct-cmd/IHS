@@ -34,6 +34,7 @@ function randomSchedule(seed: number): ScheduleInput {
       remainingDuration: 1 + Math.floor(next() * 9),
     });
   }
+  const depTypes = ["FS", "SS", "FF", "SF"] as const;
   const dependencies: DependencyInput[] = [];
   let depId = 0;
   for (let s = 1; s < count; s += 1) {
@@ -43,7 +44,7 @@ function randomSchedule(seed: number): ScheduleInput {
           id: `d${depId++}`,
           predecessorId: `a${p}`,
           successorId: `a${s}`,
-          type: "FS",
+          type: depTypes[Math.floor(next() * 4)],
           lag: 0,
           isActive: true,
         });
@@ -81,6 +82,8 @@ describe("engine invariants over randomized DAGs", () => {
             ? workingTimeBetween(a.earlyStart, a.lateStart, week)
             : -workingTimeBetween(a.lateStart, a.earlyStart, week);
         expect(a.totalFloat, `seed ${seed} ${a.id} totalFloat`).toBe(expectedFloat);
+        // Free float can never exceed total float — a universal CPM invariant.
+        expect(a.freeFloat <= a.totalFloat, `seed ${seed} ${a.id} freeFloat <= totalFloat`).toBe(true);
         if (a.earlyFinish > maxEarlyFinish) maxEarlyFinish = a.earlyFinish;
         if (a.isCritical) sawCritical = true;
       }
