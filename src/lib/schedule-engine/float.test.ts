@@ -61,4 +61,47 @@ describe("computeFloat", () => {
     const float = run(makeInput([task("a", 2), task("b", 8)], []));
     expect(float.get("a")?.freeFloat).toBe(float.get("a")?.totalFloat);
   });
+
+  it("reports negative total float for an activity an FNLT constraint over-constrains", () => {
+    const float = run(makeInput(
+      [{ id: "a", type: "task", originalDuration: 5, remainingDuration: 5,
+         constraint: { type: "FNLT", date: "2026-06-03" } }],
+      [],
+    ));
+    expect(float.get("a")?.totalFloat).toBe(-3);
+    expect(float.get("a")?.freeFloat).toBe(-3);
+    expect(float.get("a")?.isCritical).toBe(true);
+  });
+
+  it("computes free float across an FF relationship", () => {
+    const float = run(makeInput(
+      [task("a", 3), task("b", 6)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "FF", lag: 0, isActive: true }],
+    ));
+    expect(float.get("a")?.totalFloat).toBe(3);
+    expect(float.get("a")?.freeFloat).toBe(3);
+  });
+
+  it("never lets free float exceed total float across an SF relationship", () => {
+    const float = run(makeInput(
+      [task("a", 2), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "SF", lag: 0, isActive: true }],
+    ));
+    const a = float.get("a");
+    expect(a?.totalFloat).toBe(1);
+    expect(a?.freeFloat).toBe(1);
+    expect(a?.freeFloat).toBeLessThanOrEqual(a?.totalFloat as number);
+  });
+
+  it("computes free float across an SS relationship", () => {
+    const float = run(makeInput(
+      [task("a", 2), task("c", 5), task("b", 2)],
+      [
+        { id: "d1", predecessorId: "a", successorId: "b", type: "SS", lag: 0, isActive: true },
+        { id: "d2", predecessorId: "c", successorId: "b", type: "FS", lag: 0, isActive: true },
+      ],
+    ));
+    expect(float.get("a")?.totalFloat).toBe(5);
+    expect(float.get("a")?.freeFloat).toBe(5);
+  });
 });

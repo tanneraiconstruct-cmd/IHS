@@ -17,7 +17,12 @@ function signedWorkingDays(from: IsoDate, to: IsoDate, calendar: Calendar): numb
     : -workingTimeBetween(to, from, calendar);
 }
 
-/** Slack a single relationship leaves before it would delay the successor. */
+/**
+ * Slack a single relationship leaves before it would delay the successor.
+ * The `- dep.lag` term is exact when predecessor and successor share a calendar
+ * (the normal case); it is an approximation when they use different calendars —
+ * a known v1 limitation.
+ */
 function freeFloatContribution(
   dep: DependencyInput,
   predEarly: EarlyDates,
@@ -63,6 +68,11 @@ export function computeFloat(
         ),
       );
     }
+
+    // Free float can never exceed total float: an activity cannot slip more
+    // before delaying a successor than before delaying the whole project.
+    // The per-relationship formula can overshoot for SF links, so clamp here.
+    freeFloat = Math.min(freeFloat, totalFloat);
 
     result.set(activity.id, {
       totalFloat,
