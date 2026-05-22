@@ -50,4 +50,59 @@ describe("rollupWbs", () => {
     const [node] = rollupWbs(nodes, [], []);
     expect(node).toEqual({ nodeId: "n1", start: null, finish: null, percentComplete: 0 });
   });
+
+  it("rolls up through three levels of nesting", () => {
+    const nodes: WbsNode[] = [
+      { id: "gp", parentId: null, activityIds: [] },
+      { id: "p", parentId: "gp", activityIds: [] },
+      { id: "leaf", parentId: "p", activityIds: ["a"] },
+    ];
+    const activities = [activity("a", 5, 100)];
+    const results = [result("a", "2026-06-01", "2026-06-08")];
+    const byId = new Map(rollupWbs(nodes, activities, results).map((r) => [r.nodeId, r]));
+    expect(byId.get("gp")).toEqual({
+      nodeId: "gp", start: "2026-06-01", finish: "2026-06-08", percentComplete: 100,
+    });
+  });
+
+  it("ignores activities not attached to any node", () => {
+    const nodes: WbsNode[] = [{ id: "n1", parentId: null, activityIds: ["a"] }];
+    const activities = [activity("a", 5, 100), activity("b", 5, 0)];
+    const results = [
+      result("a", "2026-06-01", "2026-06-08"),
+      result("b", "2026-06-10", "2026-06-20"),
+    ];
+    const [node] = rollupWbs(nodes, activities, results);
+    expect(node).toEqual({
+      nodeId: "n1", start: "2026-06-01", finish: "2026-06-08", percentComplete: 100,
+    });
+  });
+
+  it("skips an activityId with no matching result or input", () => {
+    const nodes: WbsNode[] = [{ id: "n1", parentId: null, activityIds: ["a", "ghost"] }];
+    const activities = [activity("a", 5, 100)];
+    const results = [result("a", "2026-06-01", "2026-06-08")];
+    const [node] = rollupWbs(nodes, activities, results);
+    expect(node).toEqual({
+      nodeId: "n1", start: "2026-06-01", finish: "2026-06-08", percentComplete: 100,
+    });
+  });
+
+  it("a zero-duration milestone affects the date span but not the weighted percent", () => {
+    const nodes: WbsNode[] = [{ id: "n1", parentId: null, activityIds: ["m", "a"] }];
+    const activities: ActivityInput[] = [
+      { id: "m", type: "milestone", originalDuration: 0, remainingDuration: 0, percentComplete: 100 },
+      activity("a", 10, 0),
+    ];
+    const results = [
+      result("m", "2026-05-25", "2026-05-25"),
+      result("a", "2026-06-01", "2026-06-15"),
+    ];
+    const [node] = rollupWbs(nodes, activities, results);
+    expect(node.start).toBe("2026-05-25");
+    expect(node.finish).toBe("2026-06-15");
+    // The milestone has zero duration, so in a duration-weighted average it
+    // carries zero weight: (0*100 + 10*0) / 10 = 0.
+    expect(node.percentComplete).toBe(0);
+  });
 });
