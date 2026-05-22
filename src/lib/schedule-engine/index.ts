@@ -23,7 +23,10 @@ function validate(input: ScheduleInput): Problem[] {
   if (!calendarIds.has(input.defaultCalendarId)) {
     add(`defaultCalendarId '${input.defaultCalendarId}' is not a defined calendar`);
   }
+  const seenCalendarIds = new Set<string>();
   for (const cal of input.calendars) {
+    if (seenCalendarIds.has(cal.id)) add(`duplicate calendar id '${cal.id}'`);
+    seenCalendarIds.add(cal.id);
     if (cal.workingWeekdays.length === 0) {
       add(`calendar '${cal.id}' has no working weekdays`);
     }
