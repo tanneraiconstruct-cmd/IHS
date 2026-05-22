@@ -156,4 +156,23 @@ describe("calculate", () => {
     const result = calculate(makeInput([task("a", 1)], [], { defaultCalendarId: "ghost" }));
     expect(result.problems.some((p) => p.type === "invalid_input")).toBe(true);
   });
+
+  it("measures lag on the successor's calendar when activities use different calendars", () => {
+    // b runs on a 6-day (Mon-Sat) calendar; a uses the default Mon-Fri calendar.
+    const sixDay = { id: "sat", workingWeekdays: [1, 2, 3, 4, 5, 6], exceptions: [] };
+    const result = calculate(makeInput(
+      [task("a", 3),
+       { id: "b", type: "task", originalDuration: 2, remainingDuration: 2, calendarId: "sat" }],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "FS", lag: 2, isActive: true }],
+      { calendars: [week, sixDay] },
+    ));
+    const byId = new Map(result.activities.map((x) => [x.id, x]));
+    expect(byId.get("a")?.earlyFinish).toBe("2026-06-04");
+    // The 2-day lag is counted on b's 6-day calendar, so it spans Saturday
+    // Jun 6 — landing b's start there, not on Monday Jun 8.
+    expect(byId.get("b")?.earlyStart).toBe("2026-06-06");
+    expect(byId.get("b")?.earlyFinish).toBe("2026-06-09");
+    expect(byId.get("a")?.totalFloat).toBe(0);
+    expect(byId.get("b")?.totalFloat).toBe(0);
+  });
 });

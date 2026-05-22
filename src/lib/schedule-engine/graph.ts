@@ -27,34 +27,42 @@ export function buildGraph(
 
 /**
  * Returns one ordered activity-id list per detected cycle. Empty when the
- * graph is acyclic. Uses a depth-first search; a back-edge to a node still on
- * the recursion stack reveals a loop.
+ * graph is acyclic. Iterative depth-first search (an explicit stack, so deep
+ * chains cannot overflow the call stack); a back-edge to a node still on the
+ * active path reveals a loop.
  */
 export function detectCycles(activities: ActivityInput[], graph: ScheduleGraph): string[][] {
   const WHITE = 0, GRAY = 1, BLACK = 2;
   const color = new Map<string, number>();
   for (const a of activities) color.set(a.id, WHITE);
-  const stack: string[] = [];
   const cycles: string[][] = [];
 
-  function visit(id: string): void {
-    color.set(id, GRAY);
-    stack.push(id);
-    for (const d of graph.successors.get(id) ?? []) {
-      const next = d.successorId;
-      if (color.get(next) === GRAY) {
-        const from = stack.indexOf(next);
-        cycles.push(stack.slice(from));
-      } else if (color.get(next) === WHITE) {
-        visit(next);
+  for (const root of activities) {
+    if (color.get(root.id) !== WHITE) continue;
+    // frames mirror a recursion stack; `path` is the chain of GRAY nodes.
+    const frames: { id: string; succIndex: number }[] = [{ id: root.id, succIndex: 0 }];
+    const path: string[] = [root.id];
+    color.set(root.id, GRAY);
+
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1];
+      const succs = graph.successors.get(frame.id) ?? [];
+      if (frame.succIndex < succs.length) {
+        const next = succs[frame.succIndex].successorId;
+        frame.succIndex += 1;
+        if (color.get(next) === GRAY) {
+          cycles.push(path.slice(path.indexOf(next)));
+        } else if (color.get(next) === WHITE) {
+          color.set(next, GRAY);
+          frames.push({ id: next, succIndex: 0 });
+          path.push(next);
+        }
+      } else {
+        color.set(frame.id, BLACK);
+        frames.pop();
+        path.pop();
       }
     }
-    stack.pop();
-    color.set(id, BLACK);
-  }
-
-  for (const a of activities) {
-    if (color.get(a.id) === WHITE) visit(a.id);
   }
   return cycles;
 }

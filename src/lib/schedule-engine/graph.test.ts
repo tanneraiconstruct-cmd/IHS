@@ -57,3 +57,14 @@ describe("topologicalSort", () => {
     expect([...topologicalSort(acts, g)].sort()).toEqual(["a", "b", "c"]);
   });
 });
+
+describe("deep graphs", () => {
+  it("handles a 20000-node chain without overflowing the stack", () => {
+    const n = 20000;
+    const acts = Array.from({ length: n }, (_, i) => act(`a${i}`));
+    const deps = Array.from({ length: n - 1 }, (_, i) => dep(`d${i}`, `a${i}`, `a${i + 1}`));
+    const g = buildGraph(acts, deps);
+    expect(detectCycles(acts, g)).toEqual([]);
+    expect(topologicalSort(acts, g)).toHaveLength(n);
+  });
+});
