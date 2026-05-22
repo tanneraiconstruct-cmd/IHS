@@ -110,4 +110,42 @@ describe("forwardPass", () => {
     expect(r.violations.some((p) => p.type === "constraint_violation" && p.activityIds.includes("b")))
       .toBe(true);
   });
+
+  it("an FF successor finishes together with its predecessor", () => {
+    const r = run(makeInput(
+      [task("a", 5), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "FF", lag: 0, isActive: true }],
+    ));
+    expect(r.earlyDates.get("b")).toEqual({ es: "2026-06-03", ef: "2026-06-08" });
+  });
+
+  it("an FF successor honors positive lag", () => {
+    const r = run(makeInput(
+      [task("a", 5), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "FF", lag: 2, isActive: true }],
+    ));
+    expect(r.earlyDates.get("b")).toEqual({ es: "2026-06-05", ef: "2026-06-10" });
+  });
+
+  it("an SF successor finish is driven by the predecessor start plus lag", () => {
+    const r = run(makeInput(
+      [task("a", 2), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "SF", lag: 10, isActive: true }],
+    ));
+    expect(r.earlyDates.get("b")).toEqual({ es: "2026-06-10", ef: "2026-06-15" });
+  });
+
+  it("an FS successor honors negative lag (a lead)", () => {
+    const r = run(makeInput([task("a", 5), task("b", 3)], [fs("d", "a", "b", -2)]));
+    expect(r.earlyDates.get("b")?.es).toBe("2026-06-04");
+  });
+
+  it("schedules an in-progress activity from its actual start with remaining work floored at the data date", () => {
+    const r = run(makeInput(
+      [{ id: "a", type: "task", originalDuration: 6, remainingDuration: 4,
+         percentComplete: 40, actualStart: "2026-05-20" }],
+      [], { dataDate: "2026-06-10" },
+    ));
+    expect(r.earlyDates.get("a")).toEqual({ es: "2026-05-20", ef: "2026-06-16" });
+  });
 });
