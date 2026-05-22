@@ -73,4 +73,44 @@ describe("backwardPass", () => {
     expect(bwd.violations.some((p) => p.type === "constraint_violation" && p.activityIds.includes("b")))
       .toBe(true);
   });
+
+  it("an FF predecessor's late finish aligns with the successor's late finish", () => {
+    const { bwd } = run(makeInput(
+      [task("a", 5), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "FF", lag: 0, isActive: true }],
+    ));
+    expect(bwd.lateDates.get("a")).toEqual({ ls: "2026-06-01", lf: "2026-06-08" });
+    expect(bwd.lateDates.get("b")).toEqual({ ls: "2026-06-03", lf: "2026-06-08" });
+  });
+
+  it("an SS predecessor's late dates are driven back through the start link", () => {
+    const { bwd } = run(makeInput(
+      [task("a", 5), task("b", 4)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "SS", lag: 2, isActive: true }],
+    ));
+    expect(bwd.lateDates.get("a")).toEqual({ ls: "2026-06-01", lf: "2026-06-08" });
+  });
+
+  it("an SF predecessor's late finish is driven by the successor late finish", () => {
+    const { bwd } = run(makeInput(
+      [task("a", 2), task("b", 3)],
+      [{ id: "d", predecessorId: "a", successorId: "b", type: "SF", lag: 10, isActive: true }],
+    ));
+    expect(bwd.lateDates.get("a")).toEqual({ ls: "2026-06-01", lf: "2026-06-03" });
+  });
+
+  it("honors negative lag (a lead) in the backward direction", () => {
+    const { bwd } = run(makeInput([task("a", 5), task("b", 3)], [fs("d", "a", "b", -2)]));
+    expect(bwd.lateDates.get("a")?.lf).toBe("2026-06-08");
+    expect(bwd.lateDates.get("b")?.ls).toBe("2026-06-04");
+  });
+
+  it("pins a completed activity's late dates to its actuals", () => {
+    const { bwd } = run(makeInput(
+      [{ id: "a", type: "task", originalDuration: 5, remainingDuration: 0,
+         percentComplete: 100, actualStart: "2026-05-25", actualFinish: "2026-05-29" }],
+      [],
+    ));
+    expect(bwd.lateDates.get("a")).toEqual({ ls: "2026-05-25", lf: "2026-05-29" });
+  });
 });
