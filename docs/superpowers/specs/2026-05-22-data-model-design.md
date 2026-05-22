@@ -287,25 +287,26 @@ Defined `SECURITY DEFINER` so policies stay thin and avoid recursive RLS evaluat
 | `current_company_type()` | `company_type` | Company type of `auth.uid()`'s user; `null` if none (e.g. `service_role`). |
 | `is_member(p_project uuid)` | `boolean` | A `memberships` row exists for `auth.uid()` on the project. |
 | `role_on(p_project uuid)` | `project_role` | The caller's role on the project; `null` if not a member. |
-| `can(p_capability text, p_project uuid)` | `boolean` | Joins `role_on()` to `role_capabilities`. **No row → false** (least-privilege fallback). |
-| `cap_scope(p_capability text, p_project uuid)` | `text` | `'all'` / `'responsible'` / `null`. |
+| `has_capability(p_capability text, p_project uuid, p_is_responsible boolean default false)` | `boolean` | Joins `role_on()` to `role_capabilities`; true only when the grant's scope is satisfied (`'all'`, or `'responsible'` with `p_is_responsible`). **No row → false** (least-privilege fallback). |
 | `is_responsible(p_activity uuid)` | `boolean` | Caller's `company_id` == the activity's `responsible_company_id`. |
+
+> **Implementation note:** the originally-planned separate `can()` and `cap_scope()` helpers were consolidated into the single `has_capability()` above. A capability granted with `scope = 'responsible'` must not pass a plain existence check, so scope is folded into one mandatory check rather than left to a caller who might invoke `can()` alone.
 
 ### 5.5 Policies (`005_rls_policies.sql`)
 
 `ENABLE ROW LEVEL SECURITY` on **all 23 tables**. Per-table SELECT/INSERT/UPDATE/DELETE
 policies built from the helpers. Representative policies:
 
-- **projects** — SELECT `is_member(id)`; UPDATE `can('manage_members', id)`.
-- **activities** — SELECT `is_member(project_id)`; INSERT/DELETE `can('edit_schedule'|'soft_delete_activities', project_id)`;
-  UPDATE `can('edit_schedule', project_id) OR (current_company_type() = 'external' AND is_responsible(id))`
-  (column scope enforced by the trigger, §5.6).
-- **dependencies** — writes gated by `can('manage_dependencies', project_id)`.
+- **projects** — SELECT `is_member(id)`; UPDATE `has_capability('manage_members', id)`.
+- **activities** — SELECT `is_member(project_id)`; INSERT `has_capability('edit_schedule', project_id)`;
+  UPDATE `has_capability('edit_schedule', project_id, is_responsible(id)) OR has_capability('update_progress', project_id, is_responsible(id))`
+  (external column scope enforced by the trigger, §5.6). **No hard DELETE policy** — soft-delete is an `UPDATE` of `deleted_at`. The `soft_delete_activities` capability is *not* enforced at the RLS layer: distinguishing which internal roles may set `deleted_at` is a column-level rule, deferred to the Phase 3 server layer per the §5.6 principle that column-level distinctions among trusted internal roles live in the server (only the external boundary is enforced in-DB).
+- **dependencies** — writes gated by `has_capability('manage_dependencies', project_id)`.
 - **comments** — SELECT `is_member(project_id) AND (visibility = 'shared' OR current_company_type() = 'internal')`;
-  INSERT `WITH CHECK` the same visibility rule plus `can('post_internal_comment'|'post_shared_comment', project_id)`.
+  INSERT `WITH CHECK` the same visibility rule plus `has_capability('post_internal_comment'|'post_shared_comment', project_id)`.
 - **activity_history** — SELECT same internal/shared rule as comments; INSERT allowed for members.
   **No UPDATE or DELETE policy** → append-only (the vault audit-log pattern).
-- **memberships** — SELECT own rows or `can('manage_members', project_id)`; writes admins only.
+- **memberships** — SELECT own rows or `has_capability('manage_members', project_id)`; writes admins only.
 - Child tables (`calendar_exceptions`, `baseline_activities`, `resource_assignments`,
   `activity_code_assignments`, `lookahead_tasks`, `attachments`) inherit access by joining to
   their parent's project and the matching capability.
