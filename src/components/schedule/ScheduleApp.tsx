@@ -7,6 +7,7 @@ import { runRecalc } from "@/lib/state/recalc";
 import { useUiStore } from "@/lib/state/ui-store";
 import { ActivityTable } from "./ActivityTable/ActivityTable";
 import { GanttChart } from "./Gantt/GanttChart";
+import { ListView } from "./List/ListView";
 import { Toolbar } from "./Toolbar";
 
 interface Props {
@@ -32,10 +33,10 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
         </aside>
         <main className="flex-1 overflow-hidden">
           {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} />}
-          {view !== "gantt" && (
+          {view === "list" && <ListView bootstrap={bootstrap} indexed={indexed} />}
+          {(view === "calendar" || view === "lookahead") && (
             <div className="p-3 text-xs text-slate-500">
-              {view} view (Task 15) — engine ran: project finish ={" "}
-              {indexed.projectFinish ?? "(unsolvable)"}, problems = {indexed.problems.length}.
+              {view} view — Task {view === "calendar" ? 16 : 17}.
             </div>
           )}
         </main>
