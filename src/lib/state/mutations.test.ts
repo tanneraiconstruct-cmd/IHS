@@ -59,9 +59,11 @@ describe("persistVersioned", () => {
     });
     expect(result.ok).toBe(false);
     expect(update).toHaveBeenCalledTimes(2);
-    expect(result.kind).toBe("conflict");
-    if (result.ok === false && result.kind === "conflict") {
-      expect(result.fresh).toEqual(fresh);
+    if (result.ok === false) {
+      expect(result.kind).toBe("conflict");
+      if (result.kind === "conflict") {
+        expect(result.fresh).toEqual(fresh);
+      }
     }
   });
 });

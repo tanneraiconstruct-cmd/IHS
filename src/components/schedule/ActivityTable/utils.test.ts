@@ -24,9 +24,13 @@ describe("buildWbsTree", () => {
     const acts = [act("a1", "phase1", "Mobilize"), act("a2", null, "Loose")];
     const tree = buildWbsTree(nodes, acts);
     expect(tree).toHaveLength(2); // root group + loose activity at top
-    expect(tree[0].kind).toBe("group");
-    expect(tree[0].children[0].kind).toBe("group"); // phase1
-    expect(tree[0].children[0].children[0].kind).toBe("activity");
+    const root = tree[0];
+    if (root.kind !== "group") throw new Error("expected root to be a group");
+    expect(root.kind).toBe("group");
+    const phase1 = root.children[0];
+    if (phase1.kind !== "group") throw new Error("expected phase1 to be a group");
+    expect(phase1.kind).toBe("group");
+    expect(phase1.children[0].kind).toBe("activity");
     expect(tree[1].kind).toBe("activity"); // loose
   });
 });
