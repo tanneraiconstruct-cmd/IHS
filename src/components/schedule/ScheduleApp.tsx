@@ -12,6 +12,7 @@ import { ListView } from "./List/ListView";
 import { LookaheadView } from "./Lookahead/LookaheadView";
 import { SidePanel } from "./SidePanel/SidePanel";
 import { Toolbar } from "./Toolbar";
+import { Toasts } from "./Toasts";
 
 interface Props {
   projectId: string;
@@ -44,6 +45,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
           <SidePanel bootstrap={bootstrap} />
         </aside>
       </div>
+      <Toasts />
     </div>
   );
 }
