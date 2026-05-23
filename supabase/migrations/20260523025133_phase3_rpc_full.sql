@@ -222,8 +222,7 @@ begin
       data_date),
     schedule_dirty_at    = null,
     last_engine_problems = coalesce(p_payload->'writes'->'project_problems', '[]'::jsonb),
-    version              = version + 1,
-    updated_at           = now()
+    version              = version + 1
   where id = v_project_id;
 
   -- 9. HISTORY ROWS --------------------------------------------------------

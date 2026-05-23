@@ -52,11 +52,16 @@ const setProgress = z.object({
 }).refine(o => o.percentComplete !== undefined || o.actualStart || o.actualFinish,
   "setProgress must change at least one field");
 
+// addDependency's predecessor/successor can be either a real UUID (referencing
+// an existing activity) or a tempId string (referencing a createActivity op
+// earlier in the same batch). applyOps resolves the tempId -> UUID before the
+// engine sees the dep.
+const idOrTempId = z.string().min(1);
 const addDependency = z.object({
   type: z.literal("addDependency"),
   tempId: z.string().min(1),
-  predecessorId: uuid,
-  successorId: uuid,
+  predecessorId: idOrTempId,
+  successorId: idOrTempId,
   relType: DepTypeEnum,
   lag: z.number().int(),
 }).refine(o => o.predecessorId !== o.successorId, "self-loop not allowed");
