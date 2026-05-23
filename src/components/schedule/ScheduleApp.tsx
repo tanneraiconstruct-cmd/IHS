@@ -25,7 +25,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <Toolbar projectName={bootstrap.project.name} problemCount={indexed.problems.length} />
+      <Toolbar projectName={bootstrap.project.name} problems={indexed.problems} />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[320px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-hidden">
           <ActivityTable bootstrap={bootstrap} indexed={indexed} />
