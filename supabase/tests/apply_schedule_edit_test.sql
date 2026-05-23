@@ -16,12 +16,24 @@ declare
   v_proj   uuid := '33333333-3333-3333-3333-333333333333';
   v_cal    uuid := '44444444-4444-4444-4444-444444444444';
 begin
+  -- Wipe in FK-safe order. Integration tests share PROJECT_ID and seed
+  -- arbitrary child rows; broaden the deletes so this fixture is robust
+  -- against whatever state prior runs left behind (including integration
+  -- tests' org/company at 0000…aa / 0000…bb).
   delete from applied_edit_requests where project_id = v_proj;
+  delete from activity_history where project_id = v_proj;
+  delete from dependencies where project_id = v_proj;
+  delete from activity_constraints
+    where activity_id in (select id from activities where project_id = v_proj);
+  delete from activities where project_id = v_proj;
+  delete from wbs_nodes where project_id = v_proj;
   delete from memberships where project_id = v_proj;
+  update projects set default_calendar_id = null where id = v_proj;
+  delete from calendars where project_id = v_proj;
   delete from projects where id = v_proj;
-  delete from calendars where id = v_cal;
   delete from users where id in (v_u_sch, v_u_view);
-  delete from companies where name = 'TEST internal co';
+  delete from users where email like '%@test.local';
+  delete from companies where name in ('TEST internal co', 'TEST internal');
   delete from organizations where name = 'TEST org';
 
   insert into organizations (id, name) values (gen_random_uuid(), 'TEST org')
