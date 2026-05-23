@@ -116,34 +116,62 @@ export function buildPayload(b: BuildPayloadInput): BuildPayloadResult {
   }
 
   // 3. WRITES — turn post-engine activities + original op effects into row writes.
+  // Build a lookup of createActivity ops keyed by the new activity UUID so we
+  // can populate insert rows (wbs_node_id, name, activity_type, durations) —
+  // originalActivityInputs only covers pre-existing activities.
+  const createOpByNewId: Record<string, Extract<IntentOp, { type: "createActivity" }>> = {};
+  for (const op of b.ops) {
+    if (op.type === "createActivity") {
+      const newId = b.tempIdMap[op.tempId];
+      if (newId) createOpByNewId[newId] = op;
+    }
+  }
+  const tempIdByNewId: Record<string, string> = Object.fromEntries(
+    Object.entries(b.tempIdMap).map(([t, id]) => [id, t]),
+  );
+
   const inserts: ActivityInsertRow[] = [];
   const updates: ActivityUpdateRow[] = [];
-  const tempIdsValues = new Set(Object.values(b.tempIdMap));
+
+  const computed = (post: ActivityResult) => ({
+    early_start:    NULLABLE_DATE(post.earlyStart),
+    early_finish:   NULLABLE_DATE(post.earlyFinish),
+    late_start:     NULLABLE_DATE(post.lateStart),
+    late_finish:    NULLABLE_DATE(post.lateFinish),
+    planned_start:  NULLABLE_DATE(post.plannedStart),
+    planned_finish: NULLABLE_DATE(post.plannedFinish),
+    total_float:    post.totalFloat,
+    free_float:     post.freeFloat,
+    is_critical:    post.isCritical,
+  });
 
   for (const post of b.postEngineActivities) {
-    const meta = b.originalActivityInputs[post.id] ?? { name: "", wbs_node_id: "", activity_type: "task" };
-    const row = {
-      wbs_node_id: meta.wbs_node_id,
-      name: meta.name,
-      activity_type: meta.activity_type as ActivityInsertRow["activity_type"],
-      original_duration: 0,
-      remaining_duration: 0,
-      calendar_id: null,
-      early_start:   NULLABLE_DATE(post.earlyStart),
-      early_finish:  NULLABLE_DATE(post.earlyFinish),
-      late_start:    NULLABLE_DATE(post.lateStart),
-      late_finish:   NULLABLE_DATE(post.lateFinish),
-      planned_start: NULLABLE_DATE(post.plannedStart),
-      planned_finish:NULLABLE_DATE(post.plannedFinish),
-      total_float:   post.totalFloat,
-      free_float:    post.freeFloat,
-      is_critical:   post.isCritical,
-    } satisfies Omit<ActivityInsertRow, "temp_id">;
-    if (tempIdsValues.has(post.id)) {
-      const tempId = Object.entries(b.tempIdMap).find(([, v]) => v === post.id)![0];
-      inserts.push({ temp_id: tempId, ...row });
+    const createOp = createOpByNewId[post.id];
+    if (createOp) {
+      inserts.push({
+        temp_id: tempIdByNewId[post.id]!,
+        wbs_node_id: createOp.wbsNodeId,
+        name: createOp.name,
+        activity_type: createOp.activityType as ActivityInsertRow["activity_type"],
+        original_duration: createOp.originalDuration,
+        remaining_duration: createOp.originalDuration,
+        calendar_id: createOp.calendarId ?? null,
+        ...computed(post),
+      });
     } else {
-      updates.push({ id: post.id, ...row });
+      // Existing activity. The RPC's UPDATE only touches engine-computed columns
+      // + version, so meta fields are filler that the DB ignores.
+      const meta = b.originalActivityInputs[post.id] ?? { name: "", wbs_node_id: "", activity_type: "task" };
+      updates.push({
+        id: post.id,
+        wbs_node_id: meta.wbs_node_id,
+        name: meta.name,
+        activity_type: meta.activity_type as ActivityInsertRow["activity_type"],
+        original_duration: 0,
+        remaining_duration: 0,
+        calendar_id: null,
+        ...computed(post),
+      });
     }
   }
 
