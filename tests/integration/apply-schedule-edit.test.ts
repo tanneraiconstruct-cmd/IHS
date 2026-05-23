@@ -1,47 +1,46 @@
+// Integration tests: exercise the apply pipeline (orchestrator + RPC + DB)
+// directly with an authed Supabase client. We skip the HTTP route handler
+// here — its job is just to parse JSON + forward to applyScheduleEdit, and
+// @supabase/ssr cookie auth in a Node test process is more brittle than it's
+// worth. The HTTP layer gets covered by a manual smoke from a real frontend.
+
 import { describe, it, expect, beforeAll } from "vitest";
+import { applyScheduleEdit } from "@/lib/schedule-server/apply-schedule-edit";
 import { seedFixture, asUser, service, SCHED_ID, PROJECT_ID, WBS_ID } from "./setup";
 
 let scheduler: Awaited<ReturnType<typeof asUser>>;
+let schedulerId: string;
 
 beforeAll(async () => {
   await seedFixture();
   scheduler = await asUser(SCHED_ID);
+  schedulerId = (await scheduler.auth.getUser()).data.user!.id;
 });
 
-async function post(client: Awaited<ReturnType<typeof asUser>>, body: unknown) {
-  const { data: sessionData } = await client.auth.getSession();
-  const token = sessionData.session?.access_token;
-  return fetch("http://localhost:3000/api/schedule/apply", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}`, cookie: `sb-access-token=${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-describe("POST /api/schedule/apply (integration)", () => {
+describe("applyScheduleEdit pipeline (integration)", () => {
   it("creates an activity, runs the engine, persists computed dates", async () => {
-    const r = await post(scheduler, {
+    const response = await applyScheduleEdit({
+      client: scheduler,
       projectId: PROJECT_ID,
       editSessionId: crypto.randomUUID(),
       requestId: crypto.randomUUID(),
+      actingUserId: schedulerId,
       ops: [{
         type: "createActivity", tempId: "t1",
         wbsNodeId: WBS_ID, name: "Pour Slab",
         activityType: "task", originalDuration: 5,
       }],
     });
-    expect(r.status).toBe(200);
-    const body = await r.json();
-    expect(body.ok).toBe(true);
-    expect(body.data.temp_id_map.t1).toBeTruthy();
+
+    expect(response.ok).toBe(true);
+    if (!response.ok) return;
+    const newId = (response.data.temp_id_map as Record<string, string>).t1;
+    expect(newId).toBeTruthy();
 
     const s = service();
     const persisted = await s.from("activities")
       .select("id, planned_start, planned_finish, version")
-      .eq("id", body.data.temp_id_map.t1).single();
+      .eq("id", newId).single();
     expect(persisted.data?.planned_start).toBeTruthy();
     expect(persisted.data?.planned_finish).toBeTruthy();
     expect(persisted.data?.version).toBe(1);
@@ -53,18 +52,19 @@ describe("POST /api/schedule/apply (integration)", () => {
       .eq("project_id", PROJECT_ID).limit(1);
     const target = acts.data![0];
 
+    // Bump the row's version out-of-band so the next request's base_version is stale.
     await s.from("activities").update({ version: target.version + 5 }).eq("id", target.id);
 
     const { data } = await scheduler.rpc("apply_schedule_edit", {
       p_payload: {
         project_id: PROJECT_ID,
         request_id: crypto.randomUUID(),
-        acting_user_id: (await scheduler.auth.getUser()).data.user!.id,
+        acting_user_id: schedulerId,
         edit_session_id: crypto.randomUUID(),
         intent_op_count: 0,
         base_versions: {
           project_version: 1,
-          activities: { [target.id]: target.version },
+          activities: { [target.id]: target.version },   // stale
           dependencies: {}, constraints: {},
         },
         writes: {
@@ -80,10 +80,12 @@ describe("POST /api/schedule/apply (integration)", () => {
   });
 
   it("returns ENGINE_CYCLE when ops would create a cycle", async () => {
-    const r = await post(scheduler, {
+    const response = await applyScheduleEdit({
+      client: scheduler,
       projectId: PROJECT_ID,
       editSessionId: crypto.randomUUID(),
       requestId: crypto.randomUUID(),
+      actingUserId: schedulerId,
       ops: [
         { type: "createActivity", tempId: "ta", wbsNodeId: WBS_ID,
           name: "CycleA", activityType: "task", originalDuration: 1 },
@@ -95,29 +97,28 @@ describe("POST /api/schedule/apply (integration)", () => {
           predecessorId: "tb", successorId: "ta", relType: "FS", lag: 0 },
       ],
     });
-    expect(r.status).toBe(400);
-    const body = await r.json();
-    expect(body.error).toBe("ENGINE_CYCLE");
+    expect(response.ok).toBe(false);
+    if (response.ok) return;
+    expect(response.error).toBe("ENGINE_CYCLE");
   });
 
   it("is idempotent on retry with the same requestId", async () => {
     const reqId = crypto.randomUUID();
-    const payload = {
+    const args = {
+      client: scheduler,
       projectId: PROJECT_ID,
       editSessionId: crypto.randomUUID(),
       requestId: reqId,
+      actingUserId: schedulerId,
       ops: [{
-        type: "createActivity", tempId: "idem1", wbsNodeId: WBS_ID,
-        name: "Idempotent A", activityType: "task", originalDuration: 2,
+        type: "createActivity" as const, tempId: "idem1", wbsNodeId: WBS_ID,
+        name: "Idempotent A", activityType: "task" as const, originalDuration: 2,
       }],
     };
-    const r1 = await post(scheduler, payload);
-    const b1 = await r1.json();
-    expect(b1.ok).toBe(true);
-
-    const r2 = await post(scheduler, payload);
-    const b2 = await r2.json();
-    expect(b2).toEqual(b1);
+    const r1 = await applyScheduleEdit(args);
+    expect(r1.ok).toBe(true);
+    const r2 = await applyScheduleEdit(args);
+    expect(r2).toEqual(r1);
 
     const s = service();
     const count = await s.from("activities").select("id", { count: "exact", head: true })
