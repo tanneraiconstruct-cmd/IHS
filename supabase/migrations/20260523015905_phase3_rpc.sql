@@ -16,8 +16,13 @@ declare
   v_existing        jsonb;
   v_response        jsonb;
 begin
-  -- 0. ISOLATION  (spec §3.9 — conservative against future in-RPC reads)
-  set local transaction isolation level repeatable read;
+  -- Isolation note: this function runs in the PostgREST-managed transaction,
+  -- whose isolation level cannot be changed from inside the function body
+  -- (Postgres requires SET TRANSACTION ISOLATION LEVEL before any statement
+  -- in the tx, but PostgREST has already issued the routing query). The
+  -- design relies on per-row version checks and FOR UPDATE locking on
+  -- applied_edit_requests for correctness, not on snapshot isolation. See
+  -- design spec §3.9.
 
   -- 1. AUTH ----------------------------------------------------------------
   if auth.uid() is null then
