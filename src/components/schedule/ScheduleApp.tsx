@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
+import { clsx } from "clsx";
 import type { BootstrapData } from "@/lib/schedule/types";
 import { runRecalc } from "@/lib/state/recalc";
 import { useUiStore } from "@/lib/state/ui-store";
@@ -13,6 +14,7 @@ import { LookaheadView } from "./Lookahead/LookaheadView";
 import { SidePanel } from "./SidePanel/SidePanel";
 import { Toolbar } from "./Toolbar";
 import { Toasts } from "./Toasts";
+import { EditModeBanner } from "./EditModeBanner";
 
 interface Props {
   projectId: string;
@@ -26,11 +28,13 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
   }, [qc, projectId, bootstrap]);
 
   const view = useUiStore((s) => s.view);
+  const mode = useUiStore((s) => s.mode);
   const indexed = useMemo(() => runRecalc(bootstrap), [bootstrap]);
 
   return (
-    <div className="flex h-screen flex-col bg-white">
+    <div className={clsx("flex h-screen flex-col bg-white", mode === "edit" && "edit-mode")}>
       <Toolbar projectName={bootstrap.project.name} problems={indexed.problems} />
+      <EditModeBanner />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[320px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-hidden">
           <ActivityTable bootstrap={bootstrap} indexed={indexed} />

@@ -29,3 +29,10 @@ body {
   --gantt-day-w: 28px;
   --gantt-row-h: 36px;
 }
+
+.edit-mode .gantt-bar { cursor: grab; }
+.edit-mode .gantt-bar:active { cursor: grabbing; }
+.edit-mode .gantt-resize-handle { display: block; }
+.gantt-resize-handle { display: none; }
+.edit-mode .gantt-dep-handle { display: block; }
+.gantt-dep-handle { display: none; }
