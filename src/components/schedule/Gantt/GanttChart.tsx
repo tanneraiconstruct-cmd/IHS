@@ -114,12 +114,12 @@ export function GanttChart({ bootstrap, indexed, projectId }: Props) {
         <div className="relative" style={{ height: rows.length * ROW_H }}>
           <GanttGrid totalDays={totalDays} rowCount={rows.length} />
           <svg
-            className="pointer-events-none absolute inset-0"
+            className="absolute inset-0"
             width={totalDays * DAY_W}
             height={rows.length * ROW_H}
           >
             <defs>
-              <marker id="gantt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <marker id="gantt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto" pointerEvents="none">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
               </marker>
             </defs>
@@ -138,7 +138,7 @@ export function GanttChart({ bootstrap, indexed, projectId }: Props) {
                 const succ = barRect({
                   projectStart, plannedStart: succR.plannedStart, plannedFinish: succR.plannedFinish, rowIndex: succRowIdx,
                 });
-                return <GanttDependency key={d.id} pred={pred} succ={succ} active={d.is_active} />;
+                return <GanttDependency key={d.id} id={d.id} pred={pred} succ={succ} active={d.is_active} projectId={projectId} />;
               })}
             {drag && ghostRect && (
               <path

@@ -1,11 +1,12 @@
 "use client";
 
 import { clsx } from "clsx";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { ActivityResult } from "@/lib/schedule-engine";
 import type { DbActivity } from "@/lib/schedule/types";
-import { useSaveActivity } from "@/lib/state/mutations";
+import { useDeleteActivity, useSaveActivity } from "@/lib/state/mutations";
 import { useUiStore } from "@/lib/state/ui-store";
+import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { BAR_H, BAR_TOP_OFFSET, DAY_W, barRect, isoAddDays, type BarRect } from "./layout";
 
 interface Props {
@@ -29,6 +30,23 @@ export function GanttBar({ activity, result, projectStart, rowIndex, projectId }
     plannedFinish: result.plannedFinish,
     rowIndex,
   });
+
+  const del = useDeleteActivity(projectId);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  function onContextMenu(e: React.MouseEvent) {
+    if (mode !== "edit") return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY });
+  }
+
+  const menuItems: MenuItem[] = [
+    {
+      label: "Delete activity",
+      destructive: true,
+      onSelect: () => del.mutate(activity.id),
+    },
+  ];
 
   const canDrag = mode === "edit" && activity.activity_type !== "summary";
 
@@ -99,64 +117,72 @@ export function GanttBar({ activity, result, projectStart, rowIndex, projectId }
 
   if (activity.activity_type === "milestone") {
     return (
-      <button
-        onClick={() => select(activity.id)}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        className={clsx(
-          "gantt-bar absolute flex items-center justify-center",
-          selected && "ring-2 ring-sky-400",
-        )}
-        style={{ left: rect.left, top: rect.top + BAR_TOP_OFFSET - 2, width: 20, height: 20 }}
-        title={activity.name}
-      >
-        <span
+      <>
+        <button
+          onClick={() => select(activity.id)}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onContextMenu={onContextMenu}
           className={clsx(
-            "block h-3 w-3 rotate-45",
-            result.isCritical ? "bg-red-600" : "bg-amber-500",
+            "gantt-bar absolute flex items-center justify-center",
+            selected && "ring-2 ring-sky-400",
           )}
-        />
-      </button>
+          style={{ left: rect.left, top: rect.top + BAR_TOP_OFFSET - 2, width: 20, height: 20 }}
+          title={activity.name}
+        >
+          <span
+            className={clsx(
+              "block h-3 w-3 rotate-45",
+              result.isCritical ? "bg-red-600" : "bg-amber-500",
+            )}
+          />
+        </button>
+        {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
+      </>
     );
   }
 
   const pct = Math.max(0, Math.min(100, activity.percent_complete));
 
   return (
-    <button
-      onClick={() => select(activity.id)}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      className={clsx(
-        "gantt-bar absolute overflow-hidden rounded text-[10px] text-white",
-        result.isCritical ? "bg-red-600" : "bg-slate-600",
-        selected && "ring-2 ring-sky-400",
-      )}
-      style={{
-        left: rect.left,
-        top: rect.top + BAR_TOP_OFFSET,
-        width: rect.width,
-        height: BAR_H,
-      }}
-      title={`${activity.name} (${result.plannedStart} → ${result.plannedFinish})`}
-    >
-      {pct > 0 && (
+    <>
+      <button
+        onClick={() => select(activity.id)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onContextMenu={onContextMenu}
+        className={clsx(
+          "gantt-bar absolute overflow-hidden rounded text-[10px] text-white",
+          result.isCritical ? "bg-red-600" : "bg-slate-600",
+          selected && "ring-2 ring-sky-400",
+        )}
+        style={{
+          left: rect.left,
+          top: rect.top + BAR_TOP_OFFSET,
+          width: rect.width,
+          height: BAR_H,
+        }}
+        title={`${activity.name} (${result.plannedStart} → ${result.plannedFinish})`}
+      >
+        {pct > 0 && (
+          <span
+            aria-hidden
+            className="absolute inset-y-0 left-0 bg-black/40"
+            style={{ width: `${pct}%` }}
+          />
+        )}
+        <span className="relative block truncate px-1 leading-4">{activity.name}</span>
         <span
+          className="gantt-resize-handle absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/40"
+          onPointerDown={onResizeDown}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
           aria-hidden
-          className="absolute inset-y-0 left-0 bg-black/40"
-          style={{ width: `${pct}%` }}
         />
-      )}
-      <span className="relative block truncate px-1 leading-4">{activity.name}</span>
-      <span
-        className="gantt-resize-handle absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/40"
-        onPointerDown={onResizeDown}
-        onPointerMove={onResizeMove}
-        onPointerUp={onResizeUp}
-        aria-hidden
-      />
-    </button>
+      </button>
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
+    </>
   );
 }
