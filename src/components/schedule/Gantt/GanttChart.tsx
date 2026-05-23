@@ -12,9 +12,10 @@ import { GanttDependency } from "./GanttDependency";
 interface Props {
   bootstrap: BootstrapData;
   indexed: IndexedResult;
+  projectId: string;
 }
 
-export function GanttChart({ bootstrap, indexed }: Props) {
+export function GanttChart({ bootstrap, indexed, projectId }: Props) {
   const criticalOnly = useUiStore((s) => s.filters.criticalOnly);
   const projectStart = bootstrap.project.project_start;
 
@@ -87,6 +88,7 @@ export function GanttChart({ bootstrap, indexed }: Props) {
                 result={r}
                 projectStart={projectStart}
                 rowIndex={i}
+                projectId={projectId}
               />
             );
           })}

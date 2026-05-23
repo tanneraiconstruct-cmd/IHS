@@ -40,7 +40,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
           <ActivityTable bootstrap={bootstrap} indexed={indexed} />
         </aside>
         <main className="flex-1 overflow-hidden">
-          {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} />}
+          {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} projectId={projectId} />}
           {view === "list" && <ListView bootstrap={bootstrap} indexed={indexed} />}
           {view === "calendar" && <CalendarView bootstrap={bootstrap} indexed={indexed} />}
           {view === "lookahead" && <LookaheadView bootstrap={bootstrap} indexed={indexed} />}
