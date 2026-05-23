@@ -46,7 +46,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
           {view === "lookahead" && <LookaheadView bootstrap={bootstrap} indexed={indexed} />}
         </main>
         <aside className="w-[340px] shrink-0 border-l border-slate-200 bg-slate-50">
-          <SidePanel bootstrap={bootstrap} />
+          <SidePanel bootstrap={bootstrap} projectId={projectId} />
         </aside>
       </div>
       <Toasts />

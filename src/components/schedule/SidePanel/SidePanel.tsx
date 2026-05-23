@@ -4,11 +4,13 @@ import { clsx } from "clsx";
 import { useMemo, useState } from "react";
 import type { BootstrapData } from "@/lib/schedule/types";
 import { useUiStore } from "@/lib/state/ui-store";
+import { CommentComposer } from "./CommentComposer";
 
 type Filter = "all" | "comments" | "history";
 
 interface Props {
   bootstrap: BootstrapData;
+  projectId: string;
 }
 
 interface FeedItem {
@@ -20,7 +22,7 @@ interface FeedItem {
   meta?: string;
 }
 
-export function SidePanel({ bootstrap }: Props) {
+export function SidePanel({ bootstrap, projectId }: Props) {
   const selectedId = useUiStore((s) => s.selectedActivityId);
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -96,6 +98,7 @@ export function SidePanel({ bootstrap }: Props) {
           ))
         )}
       </div>
+      <CommentComposer projectId={projectId} />
     </div>
   );
 }
