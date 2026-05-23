@@ -6,6 +6,7 @@ import type { BootstrapData } from "@/lib/schedule/types";
 import { runRecalc } from "@/lib/state/recalc";
 import { useUiStore } from "@/lib/state/ui-store";
 import { ActivityTable } from "./ActivityTable/ActivityTable";
+import { GanttChart } from "./Gantt/GanttChart";
 import { Toolbar } from "./Toolbar";
 
 interface Props {
@@ -30,11 +31,13 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
           <ActivityTable bootstrap={bootstrap} indexed={indexed} />
         </aside>
         <main className="flex-1 overflow-hidden">
-          <div className="p-3 text-xs text-slate-500">
-            Main view: <span className="font-medium text-slate-800">{view}</span>{" "}
-            (Tasks 13–15). Engine ran: project finish ={" "}
-            {indexed.projectFinish ?? "(unsolvable)"}, problems = {indexed.problems.length}.
-          </div>
+          {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} />}
+          {view !== "gantt" && (
+            <div className="p-3 text-xs text-slate-500">
+              {view} view (Task 15) — engine ran: project finish ={" "}
+              {indexed.projectFinish ?? "(unsolvable)"}, problems = {indexed.problems.length}.
+            </div>
+          )}
         </main>
         <aside className="w-[340px] shrink-0 border-l border-slate-200 bg-slate-50">
           <div className="p-3 text-xs text-slate-500">Side panel (Task 16)</div>
