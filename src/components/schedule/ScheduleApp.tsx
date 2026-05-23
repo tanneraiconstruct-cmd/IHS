@@ -10,6 +10,7 @@ import { GanttChart } from "./Gantt/GanttChart";
 import { CalendarView } from "./Calendar/CalendarView";
 import { ListView } from "./List/ListView";
 import { LookaheadView } from "./Lookahead/LookaheadView";
+import { SidePanel } from "./SidePanel/SidePanel";
 import { Toolbar } from "./Toolbar";
 
 interface Props {
@@ -40,7 +41,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
           {view === "lookahead" && <LookaheadView bootstrap={bootstrap} indexed={indexed} />}
         </main>
         <aside className="w-[340px] shrink-0 border-l border-slate-200 bg-slate-50">
-          <div className="p-3 text-xs text-slate-500">Side panel (Task 16)</div>
+          <SidePanel bootstrap={bootstrap} />
         </aside>
       </div>
     </div>
