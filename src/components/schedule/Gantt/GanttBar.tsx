@@ -32,6 +32,43 @@ export function GanttBar({ activity, result, projectStart, rowIndex, projectId }
 
   const canDrag = mode === "edit" && activity.activity_type !== "summary";
 
+  const resizeStateRef = useRef<{ startX: number; deltaDays: number } | null>(null);
+
+  function onResizeDown(e: React.PointerEvent<HTMLSpanElement>) {
+    if (!canDrag) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    resizeStateRef.current = { startX: e.clientX, deltaDays: 0 };
+  }
+  function onResizeMove(e: React.PointerEvent<HTMLSpanElement>) {
+    if (!resizeStateRef.current) return;
+    const dx = e.clientX - resizeStateRef.current.startX;
+    const days = Math.round(dx / DAY_W);
+    if (days !== resizeStateRef.current.deltaDays) {
+      resizeStateRef.current.deltaDays = days;
+      // Visually preview by adjusting the bar width on the parent button.
+      const button = (e.currentTarget as HTMLElement).parentElement as HTMLElement;
+      const newWidth = Math.max(DAY_W, rect.width + days * DAY_W);
+      button.style.width = `${newWidth}px`;
+    }
+  }
+  function onResizeUp(e: React.PointerEvent<HTMLSpanElement>) {
+    const state = resizeStateRef.current;
+    resizeStateRef.current = null;
+    const button = (e.currentTarget as HTMLElement).parentElement as HTMLElement;
+    button.style.width = "";
+    if (!state || state.deltaDays === 0) return;
+    const newDuration = Math.max(0, activity.original_duration + state.deltaDays);
+    save.mutate({
+      id: activity.id,
+      patch: {
+        original_duration: newDuration,
+        remaining_duration: Math.max(0, activity.remaining_duration + state.deltaDays),
+      },
+    });
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (!canDrag) return;
     e.preventDefault();
@@ -113,6 +150,13 @@ export function GanttBar({ activity, result, projectStart, rowIndex, projectId }
         />
       )}
       <span className="relative block truncate px-1 leading-4">{activity.name}</span>
+      <span
+        className="gantt-resize-handle absolute inset-y-0 right-0 w-1.5 cursor-ew-resize bg-white/40"
+        onPointerDown={onResizeDown}
+        onPointerMove={onResizeMove}
+        onPointerUp={onResizeUp}
+        aria-hidden
+      />
     </button>
   );
 }
