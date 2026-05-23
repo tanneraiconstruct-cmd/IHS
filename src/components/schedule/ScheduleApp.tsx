@@ -37,7 +37,7 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
       <EditModeBanner />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[320px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-hidden">
-          <ActivityTable bootstrap={bootstrap} indexed={indexed} />
+          <ActivityTable bootstrap={bootstrap} indexed={indexed} projectId={projectId} />
         </aside>
         <main className="flex-1 overflow-hidden">
           {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} projectId={projectId} />}
