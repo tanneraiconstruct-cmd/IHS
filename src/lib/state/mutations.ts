@@ -4,6 +4,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { markInflight } from "@/lib/realtime/echo-set";
 import type {
   BootstrapData, DbActivity, DbActivityHistory, DbDependency,
+  DbLookahead, DbLookaheadTask,
 } from "@/lib/schedule/types";
 import { runRecalc } from "./recalc";
 import { useUiStore } from "./ui-store";
@@ -37,6 +38,54 @@ export function applyOptimisticDependencyPatch(
     ...data,
     dependencies: data.dependencies.map((d) =>
       d.id === id ? { ...d, ...patch } : d,
+    ),
+  };
+}
+
+export function applyOptimisticLookaheadPatch(
+  data: BootstrapData,
+  id: string,
+  patch: Partial<DbLookahead>,
+): BootstrapData {
+  return {
+    ...data,
+    lookaheads: data.lookaheads.map((l) =>
+      l.id === id ? { ...l, ...patch } : l,
+    ),
+  };
+}
+
+export function applyOptimisticLookaheadTaskPatch(
+  data: BootstrapData,
+  id: string,
+  patch: Partial<DbLookaheadTask>,
+): BootstrapData {
+  return {
+    ...data,
+    lookaheadTasks: data.lookaheadTasks.map((t) =>
+      t.id === id ? { ...t, ...patch } : t,
+    ),
+  };
+}
+
+export function softDeleteFromCache(
+  data: BootstrapData,
+  kind: "lookahead" | "lookaheadTask",
+  id: string,
+  deletedAt: string,
+): BootstrapData {
+  if (kind === "lookahead") {
+    return {
+      ...data,
+      lookaheads: data.lookaheads.map((l) =>
+        l.id === id ? { ...l, deleted_at: deletedAt } : l,
+      ),
+    };
+  }
+  return {
+    ...data,
+    lookaheadTasks: data.lookaheadTasks.map((t) =>
+      t.id === id ? { ...t, deleted_at: deletedAt } : t,
     ),
   };
 }
