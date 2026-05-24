@@ -133,7 +133,7 @@ function indexed(...rows: { id: string; plannedStart: string; plannedFinish: str
   const byActivity = new Map<string, ScheduleResult["activities"][number]>();
   for (const r of rows) {
     byActivity.set(r.id, {
-      id: r.id, type: "task" as const,
+      id: r.id,
       earlyStart: r.plannedStart, earlyFinish: r.plannedFinish,
       lateStart: r.plannedStart, lateFinish: r.plannedFinish,
       plannedStart: r.plannedStart, plannedFinish: r.plannedFinish,
@@ -1626,7 +1626,7 @@ function indexed(...rows: { id: string; plannedStart: string; plannedFinish: str
   const byActivity = new Map<string, ScheduleResult["activities"][number]>();
   for (const r of rows) {
     byActivity.set(r.id, {
-      id: r.id, type: "task",
+      id: r.id,
       earlyStart: r.plannedStart, earlyFinish: r.plannedFinish,
       lateStart: r.plannedStart, lateFinish: r.plannedFinish,
       plannedStart: r.plannedStart, plannedFinish: r.plannedFinish,
