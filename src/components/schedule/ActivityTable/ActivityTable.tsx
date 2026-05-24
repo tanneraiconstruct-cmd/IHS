@@ -8,9 +8,10 @@ import { WbsRow } from "./WbsRow";
 interface Props {
   bootstrap: BootstrapData;
   indexed: IndexedResult;
+  projectId: string;
 }
 
-export function ActivityTable({ bootstrap, indexed }: Props) {
+export function ActivityTable({ bootstrap, indexed, projectId }: Props) {
   const tree = useMemo(
     () => buildWbsTree(bootstrap.wbsNodes, bootstrap.activities),
     [bootstrap.wbsNodes, bootstrap.activities],
@@ -48,6 +49,7 @@ export function ActivityTable({ bootstrap, indexed }: Props) {
           expanded={expanded}
           onToggle={toggle}
           indexed={indexed}
+          projectId={projectId}
         />
       ))}
     </div>

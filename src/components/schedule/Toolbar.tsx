@@ -2,9 +2,11 @@
 
 import { clsx } from "clsx";
 import { Calendar, Edit3, List, Search, TimerReset, Zap } from "lucide-react";
+import type { Problem } from "@/lib/schedule-engine";
 import { useUiStore, type ScheduleView } from "@/lib/state/ui-store";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { ProblemsBadge } from "./ProblemsBadge";
 
 const VIEWS: { key: ScheduleView; label: string; Icon: typeof List }[] = [
   { key: "gantt", label: "Gantt", Icon: TimerReset },
@@ -15,10 +17,10 @@ const VIEWS: { key: ScheduleView; label: string; Icon: typeof List }[] = [
 
 interface ToolbarProps {
   projectName: string;
-  problemCount: number;
+  problems: Problem[];
 }
 
-export function Toolbar({ projectName, problemCount }: ToolbarProps) {
+export function Toolbar({ projectName, problems }: ToolbarProps) {
   const view = useUiStore((s) => s.view);
   const setView = useUiStore((s) => s.setView);
   const mode = useUiStore((s) => s.mode);
@@ -71,11 +73,7 @@ export function Toolbar({ projectName, problemCount }: ToolbarProps) {
           <Zap size={14} />
           Critical path
         </button>
-        {problemCount > 0 && (
-          <span className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800">
-            {problemCount} problem{problemCount === 1 ? "" : "s"}
-          </span>
-        )}
+        <ProblemsBadge problems={problems} />
         <button
           onClick={mode === "edit" ? exitEditMode : enterEditMode}
           className={clsx(
