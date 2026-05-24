@@ -36,7 +36,7 @@ function bs(activities: DbActivity[]): BootstrapData {
       comment_visibility_default: "internal" },
     calendars: [], calendarExceptions: [], wbsNodes: [],
     activities, dependencies: [], constraints: [], comments: [], history: [],
-    lookaheads: [], lookaheadTasks: [],
+    lookaheads: [], lookaheadTasks: [], users: {},
   };
 }
 

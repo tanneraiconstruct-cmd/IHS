@@ -34,6 +34,7 @@ function makeData(over: Partial<BootstrapData> = {}): BootstrapData {
     comments: [], history: [],
     lookaheads: [lookahead()],
     lookaheadTasks: [task()],
+    users: {},
     ...over,
   };
 }
