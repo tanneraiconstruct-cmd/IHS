@@ -63,6 +63,7 @@ export interface DbDependency {
 
 export interface DbActivityConstraint {
   id: string;
+  project_id: string;
   activity_id: string;
   type: "SNET" | "SNLT" | "FNET" | "FNLT" | "MSO" | "MFO" | "ALAP";
   constraint_date: string | null;

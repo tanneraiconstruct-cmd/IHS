@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { markInflight } from "@/lib/realtime/echo-set";
 import type {
   BootstrapData, DbActivity, DbActivityHistory, DbDependency,
 } from "@/lib/schedule/types";
@@ -150,16 +151,26 @@ export function useSaveActivity(projectId: string) {
       });
 
       if (!result.ok) {
-        // Rollback optimistic patch.
-        qc.setQueryData(["schedule", projectId], data);
+        // Per-row rollback — do NOT restore the full snapshot, which would clobber
+        // realtime updates to sibling rows received during the mutation.
+        const snapshotRow = current;
         if (result.kind === "conflict") {
-          // Update cache with fresh row.
-          qc.setQueryData(["schedule", projectId], {
-            ...data,
-            activities: data.activities.map((a) => (a.id === vars.id ? result.fresh : a)),
+          qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+            if (!cur) return cur;
+            return {
+              ...cur,
+              activities: cur.activities.map((a) => a.id === vars.id ? result.fresh : a),
+            };
           });
           toast.error("This activity was changed by someone else — your edit was discarded.");
         } else {
+          qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+            if (!cur) return cur;
+            return {
+              ...cur,
+              activities: cur.activities.map((a) => a.id === vars.id ? snapshotRow : a),
+            };
+          });
           toast.error(`Save failed: ${result.message}`);
         }
         return;
@@ -215,21 +226,28 @@ export function useSaveActivity(projectId: string) {
         }
       }
 
-      // Best-effort cascade writes (no version check). See plan §Concurrency model.
+      // Cascade writes: per-row update that bumps version so realtime receivers accept the event.
       if (cascadeUpdates.length > 0) {
-        const payload = cascadeUpdates.map((a) => ({
-          id: a.id,
-          planned_start: a.planned_start,
-          planned_finish: a.planned_finish,
-          early_start: a.early_start,
-          early_finish: a.early_finish,
-          late_start: a.late_start,
-          late_finish: a.late_finish,
-          total_float: a.total_float,
-          free_float: a.free_float,
-          is_critical: a.is_critical,
-        }));
-        const { error: cascadeErr } = await sb.from("activities").upsert(payload);
+        const results = await Promise.all(
+          cascadeUpdates.map((a) =>
+            sb
+              .from("activities")
+              .update({
+                planned_start: a.planned_start,
+                planned_finish: a.planned_finish,
+                early_start: a.early_start,
+                early_finish: a.early_finish,
+                late_start: a.late_start,
+                late_finish: a.late_finish,
+                total_float: a.total_float,
+                free_float: a.free_float,
+                is_critical: a.is_critical,
+                version: a.version + 1,
+              })
+              .eq("id", a.id),
+          ),
+        );
+        const cascadeErr = results.find((r) => r.error)?.error;
         if (cascadeErr) toast.warn(`Cascade write failed: ${cascadeErr.message}`);
       }
 
@@ -280,6 +298,7 @@ export function useInsertDependency(projectId: string) {
         if (!prev) return prev;
         return { ...prev, dependencies: [...prev.dependencies, data as unknown as DbDependency] };
       });
+      markInflight(data.id);
 
       const sessionId = useUiStore.getState().editSessionId;
       await insertHistoryRows(
@@ -346,7 +365,13 @@ export function useToggleDependencyActive(projectId: string) {
 
       const { error } = await sb.from("dependencies").update({ is_active: next }).eq("id", id);
       if (error) {
-        qc.setQueryData(["schedule", projectId], data);
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            dependencies: cur.dependencies.map((d) => d.id === id ? dep : d),
+          };
+        });
         toast.error(`Toggle failed: ${error.message}`);
         return;
       }
@@ -396,6 +421,7 @@ export function usePostComment(projectId: string) {
         if (!prev) return prev;
         return { ...prev, comments: [data as never, ...prev.comments] };
       });
+      markInflight(data.id);
     },
   });
 }

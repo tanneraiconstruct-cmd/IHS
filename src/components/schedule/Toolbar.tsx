@@ -1,6 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
+import type { ReactNode } from "react";
 import { Calendar, Edit3, List, Search, TimerReset, Zap } from "lucide-react";
 import type { Problem } from "@/lib/schedule-engine";
 import { useUiStore, type ScheduleView } from "@/lib/state/ui-store";
@@ -18,9 +19,10 @@ const VIEWS: { key: ScheduleView; label: string; Icon: typeof List }[] = [
 interface ToolbarProps {
   projectName: string;
   problems: Problem[];
+  right?: ReactNode;
 }
 
-export function Toolbar({ projectName, problems }: ToolbarProps) {
+export function Toolbar({ projectName, problems, right }: ToolbarProps) {
   const view = useUiStore((s) => s.view);
   const setView = useUiStore((s) => s.setView);
   const mode = useUiStore((s) => s.mode);
@@ -60,6 +62,7 @@ export function Toolbar({ projectName, problems }: ToolbarProps) {
         </nav>
       </div>
       <div className="flex items-center gap-2">
+        {right}
         <button
           onClick={() => setFilter("criticalOnly", !criticalOnly)}
           className={clsx(
