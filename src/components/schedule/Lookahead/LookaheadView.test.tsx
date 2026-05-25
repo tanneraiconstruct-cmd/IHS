@@ -63,6 +63,7 @@ function makeBootstrap(): BootstrapData {
       task({ id: "T2", master_activity_id: null, name: "Site cleanup",
         start_date: "2026-05-15", finish_date: "2026-05-15" }),
     ],
+    users: {},
   };
 }
 
