@@ -13,6 +13,7 @@ import type {
   DbLookaheadTask,
   DbProject,
   DbWbsNode,
+  UserLookupEntry,
 } from "./types";
 
 interface UserRow {
@@ -21,8 +22,8 @@ interface UserRow {
   full_name: string;
 }
 
-export function buildUserLookup(rows: UserRow[]): Record<string, import("./types").UserLookupEntry> {
-  const out: Record<string, import("./types").UserLookupEntry> = {};
+export function buildUserLookup(rows: UserRow[]): Record<string, UserLookupEntry> {
+  const out: Record<string, UserLookupEntry> = {};
   for (const r of rows) {
     out[r.id] = {
       id: r.id,
