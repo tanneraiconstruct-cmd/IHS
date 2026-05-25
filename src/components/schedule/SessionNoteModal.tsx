@@ -10,17 +10,23 @@ interface Props {
 }
 
 export function SessionNoteModal({ isOpen, changeCount, onSave, onClose }: Props) {
+  if (!isOpen) return null;
+  return <ModalContent changeCount={changeCount} onSave={onSave} onClose={onClose} />;
+}
+
+interface ContentProps {
+  changeCount: number;
+  onSave: (note: string) => void;
+  onClose: () => void;
+}
+
+function ModalContent({ changeCount, onSave, onClose }: ContentProps) {
   const [note, setNote] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setNote("");
-      requestAnimationFrame(() => textareaRef.current?.focus());
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
 
   function handleSave() {
     const trimmed = note.trim();

@@ -63,9 +63,11 @@ afterEach(() => {
 });
 
 function wrap(qc: QueryClient) {
-  return ({ children }: { children: ReactNode }) => (
+  const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
+  Wrapper.displayName = "TestWrapper";
+  return Wrapper;
 }
 
 function seed(qc: QueryClient): BootstrapData {
