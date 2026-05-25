@@ -47,4 +47,23 @@ describe("useUiStore", () => {
     s.setVisibilityFilter("shared");
     expect(useUiStore.getState().visibilityFilter).toBe("shared");
   });
+
+  it("starts with dateAnchor = '' and setDateAnchor updates it", () => {
+    const s = useUiStore.getState();
+    expect(s.dateAnchor).toBe("");
+    s.setDateAnchor("2026-07-01");
+    expect(useUiStore.getState().dateAnchor).toBe("2026-07-01");
+  });
+
+  it("setDateAnchor preserves selectedActivityId and filters across a view switch", () => {
+    useUiStore.getState().select("act-1");
+    useUiStore.getState().setFilter("criticalOnly", true);
+    useUiStore.getState().setDateAnchor("2026-07-01");
+    useUiStore.getState().setView("calendar");
+    const s = useUiStore.getState();
+    expect(s.view).toBe("calendar");
+    expect(s.selectedActivityId).toBe("act-1");
+    expect(s.filters.criticalOnly).toBe(true);
+    expect(s.dateAnchor).toBe("2026-07-01");
+  });
 });
