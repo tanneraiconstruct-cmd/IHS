@@ -20,6 +20,10 @@ function isoOf(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+export function monthStartIso(iso: string): string {
+  return isoOf(startOfMonthUtc(iso));
+}
+
 export function CalendarView({ bootstrap, indexed }: Props) {
   const [anchor, setAnchor] = useState(() => startOfMonthUtc(bootstrap.project.project_start));
   const select = useUiStore((s) => s.select);
