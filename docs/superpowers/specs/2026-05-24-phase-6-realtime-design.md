@@ -64,8 +64,8 @@ This phase makes two browsers editing the same project stay in sync without clob
 
 - `activities` carries `version` (int, incremented per write) and `deleted_at` (soft delete).
 - `dependencies`, `wbs_nodes`, `comments`, `activity_history`, `activity_constraints` exist with appropriate columns. None except `activities` is versioned.
-- `comments` and `activity_history` carry `visibility ∈ {internal, shared}` with RLS policies enforcing the distinction (`is_project_member` for shared; member-with-internal-access for internal). The Phase 4 E2E `e3b3b5b` proves an external user cannot SELECT internal rows.
-- `is_project_member(project_id uuid)` and capability-checking helpers exist as SQL functions (`20260522144357_rls_functions.sql`).
+- `comments` and `activity_history` carry `visibility ∈ {internal, shared}` with RLS policies enforcing the distinction (`is_member` for shared; member-with-internal-access for internal). The Phase 4 E2E `e3b3b5b` proves an external user cannot SELECT internal rows.
+- `is_member(project_id uuid)` and capability-checking helpers exist as SQL functions (`20260522144357_rls_functions.sql`). All existing `_select` policies use the pattern `using (is_member(project_id))`.
 
 ### 2.2 State (Phase 4 / Section 5)
 
@@ -405,11 +405,10 @@ create index activity_constraints_project_id_idx
   on public.activity_constraints (project_id);
 
 -- 2. RLS SELECT policy for activity_constraints (mirrors other tables).
--- Confirm exact pattern by reading 20260522145151_rls_policies.sql first.
-drop policy if exists "activity_constraints_select" on public.activity_constraints;
-create policy "activity_constraints_select"
-  on public.activity_constraints for select
-  using (is_project_member(project_id));
+drop policy if exists activity_constraints_select on public.activity_constraints;
+create policy activity_constraints_select on public.activity_constraints
+  for select to authenticated
+  using (is_member(project_id));
 
 -- 3. replica identity full — so DELETE and UPDATE events ship complete row data.
 alter table public.activities             replica identity full;
