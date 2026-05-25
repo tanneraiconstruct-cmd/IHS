@@ -150,16 +150,26 @@ export function useSaveActivity(projectId: string) {
       });
 
       if (!result.ok) {
-        // Rollback optimistic patch.
-        qc.setQueryData(["schedule", projectId], data);
+        // Per-row rollback — do NOT restore the full snapshot, which would clobber
+        // realtime updates to sibling rows received during the mutation.
+        const snapshotRow = current;
         if (result.kind === "conflict") {
-          // Update cache with fresh row.
-          qc.setQueryData(["schedule", projectId], {
-            ...data,
-            activities: data.activities.map((a) => (a.id === vars.id ? result.fresh : a)),
+          qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+            if (!cur) return cur;
+            return {
+              ...cur,
+              activities: cur.activities.map((a) => a.id === vars.id ? result.fresh : a),
+            };
           });
           toast.error("This activity was changed by someone else — your edit was discarded.");
         } else {
+          qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+            if (!cur) return cur;
+            return {
+              ...cur,
+              activities: cur.activities.map((a) => a.id === vars.id ? snapshotRow : a),
+            };
+          });
           toast.error(`Save failed: ${result.message}`);
         }
         return;
@@ -353,7 +363,13 @@ export function useToggleDependencyActive(projectId: string) {
 
       const { error } = await sb.from("dependencies").update({ is_active: next }).eq("id", id);
       if (error) {
-        qc.setQueryData(["schedule", projectId], data);
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            dependencies: cur.dependencies.map((d) => d.id === id ? dep : d),
+          };
+        });
         toast.error(`Toggle failed: ${error.message}`);
         return;
       }
