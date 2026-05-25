@@ -144,7 +144,15 @@ function reduceHistory(
   data: BootstrapData,
   event: Extract<RealtimeRowEvent, { table: "activity_history" }>,
 ): BootstrapData {
-  // append-only; no echo filter
-  if (data.history.some((h) => h.id === event.new.id)) return data;
-  return { ...data, history: [event.new, ...data.history] };
+  if (event.type === "INSERT") {
+    // append-only; no echo filter
+    if (data.history.some((h) => h.id === event.new.id)) return data;
+    return { ...data, history: [event.new, ...data.history] };
+  }
+  // UPDATE — replace by id; no-op if absent (late-bind or echo).
+  const idx = data.history.findIndex((h) => h.id === event.new.id);
+  if (idx === -1) return data;
+  const next = [...data.history];
+  next[idx] = event.new;
+  return { ...data, history: next };
 }
