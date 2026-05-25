@@ -3,6 +3,7 @@ import { create } from "zustand";
 export type ScheduleView = "gantt" | "list" | "calendar" | "lookahead";
 export type Mode = "view" | "edit";
 export type Zoom = "day" | "week" | "month";
+export type VisibilityFilter = "all" | "internal" | "shared";
 
 export interface Filters {
   criticalOnly: boolean;
@@ -17,6 +18,7 @@ interface UiState {
   selectedActivityId: string | null;
   editSessionId: string | null;
   filters: Filters;
+  visibilityFilter: VisibilityFilter;
 }
 
 interface UiActions {
@@ -26,6 +28,7 @@ interface UiActions {
   enterEditMode: () => void;
   exitEditMode: () => void;
   setFilter: <K extends keyof Filters>(key: K, value: Filters[K]) => void;
+  setVisibilityFilter: (v: VisibilityFilter) => void;
 }
 
 const initialState: UiState = {
@@ -35,6 +38,7 @@ const initialState: UiState = {
   selectedActivityId: null,
   editSessionId: null,
   filters: { criticalOnly: false, trade: null, responsibleCompanyId: null },
+  visibilityFilter: "all",
 };
 
 export const useUiStore = create<UiState & UiActions>((set) => ({
@@ -47,6 +51,7 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   exitEditMode: () => set({ mode: "view", editSessionId: null }),
   setFilter: (key, value) =>
     set((s) => ({ filters: { ...s.filters, [key]: value } })),
+  setVisibilityFilter: (v) => set({ visibilityFilter: v }),
 }));
 
 // Expose the initial state for test resets.

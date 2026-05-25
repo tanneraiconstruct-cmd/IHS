@@ -20,4 +20,12 @@ test("external trade-partner viewer cannot see edit controls or internal comment
   // toggle button text (outside any <li>) does not cause a false failure.
   const internalChip = page.locator("li").locator("text=internal");
   await expect(internalChip).toHaveCount(0);
+
+  // Phase 7: external users have no `internal` option in the visibility filter chip row.
+  const visFilter = page.getByTestId("visibility-filter");
+  await expect(visFilter).toBeVisible();
+  await expect(visFilter.getByRole("button", { name: /^internal$/i })).toHaveCount(0);
+  // `shared` and `all` are present.
+  await expect(visFilter.getByRole("button", { name: /^shared$/i })).toBeVisible();
+  await expect(visFilter.getByRole("button", { name: /^all$/i })).toBeVisible();
 });

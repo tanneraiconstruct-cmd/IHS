@@ -301,6 +301,8 @@ export function useInsertDependency(projectId: string) {
       markInflight(data.id);
 
       const sessionId = useUiStore.getState().editSessionId;
+      const cache = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const visibility = cache?.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{
@@ -308,7 +310,7 @@ export function useInsertDependency(projectId: string) {
           oldValue: null, newValue: `${vars.predecessorId}→${vars.successorId} ${vars.type}+${vars.lag}`,
         }],
         sessionId,
-        "shared",
+        visibility,
         user.id,
       );
     },
@@ -339,10 +341,12 @@ export function useDeleteActivity(projectId: string) {
         };
       });
       const sessionId = useUiStore.getState().editSessionId;
+      const cache = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const visibility = cache?.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{ projectId, entityType: "activity", entityId: id, field: "deleted_at", oldValue: null, newValue: now }],
-        sessionId, "shared", user.id,
+        sessionId, visibility, user.id,
       );
     },
   });
@@ -379,10 +383,11 @@ export function useToggleDependencyActive(projectId: string) {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) return;
       const sessionId = useUiStore.getState().editSessionId;
+      const visibility = data.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{ projectId, entityType: "dependency", entityId: id, field: "is_active", oldValue: String(!next), newValue: String(next) }],
-        sessionId, "shared", user.id,
+        sessionId, visibility, user.id,
       );
     },
   });
@@ -422,6 +427,165 @@ export function usePostComment(projectId: string) {
         return { ...prev, comments: [data as never, ...prev.comments] };
       });
       markInflight(data.id);
+    },
+  });
+}
+
+export function useUpdateComment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["updateComment", projectId],
+    mutationFn: async (vars: { commentId: string; body: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const prev = data?.comments.find((c) => c.id === vars.commentId);
+      if (!data || !prev) {
+        toast.error("Comment not in cache");
+        return;
+      }
+
+      const editedAt = new Date().toISOString();
+
+      // Optimistic patch.
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) =>
+            c.id === vars.commentId ? { ...c, body: vars.body, edited_at: editedAt } : c),
+        };
+      });
+      markInflight(vars.commentId);
+
+      const { data: updated, error } = await sb
+        .from("comments")
+        .update({ body: vars.body, edited_at: editedAt })
+        .eq("id", vars.commentId)
+        .select("id, project_id, author_user_id, body, parent_comment_id, scope, target_activity_id, visibility, created_at, edited_at, deleted_at")
+        .single();
+
+      if (error || !updated) {
+        // Rollback.
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            comments: cur.comments.map((c) => c.id === vars.commentId ? prev : c),
+          };
+        });
+        toast.error(`Comment edit failed: ${error?.message ?? "unknown"}`);
+        return;
+      }
+
+      // Replace with authoritative row.
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) => c.id === vars.commentId ? (updated as unknown as typeof c) : c),
+        };
+      });
+    },
+  });
+}
+
+export function useSoftDeleteComment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["softDeleteComment", projectId],
+    mutationFn: async (vars: { commentId: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const prev = data?.comments.find((c) => c.id === vars.commentId);
+      if (!data || !prev) {
+        toast.error("Comment not in cache");
+        return;
+      }
+
+      const deletedAt = new Date().toISOString();
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) =>
+            c.id === vars.commentId ? { ...c, deleted_at: deletedAt } : c),
+        };
+      });
+      markInflight(vars.commentId);
+
+      const { data: updated, error } = await sb
+        .from("comments")
+        .update({ deleted_at: deletedAt })
+        .eq("id", vars.commentId)
+        .select("id, project_id, author_user_id, body, parent_comment_id, scope, target_activity_id, visibility, created_at, edited_at, deleted_at")
+        .single();
+
+      if (error || !updated) {
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return { ...cur, comments: cur.comments.map((c) => c.id === vars.commentId ? prev : c) };
+        });
+        toast.error(`Comment delete failed: ${error?.message ?? "unknown"}`);
+        return;
+      }
+
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) => c.id === vars.commentId ? (updated as unknown as typeof c) : c),
+        };
+      });
+    },
+  });
+}
+
+export function useSetSessionNote(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["setSessionNote", projectId],
+    mutationFn: async (vars: { editSessionId: string; note: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) throw new Error("No user");
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      const affected = data.history.filter(
+        (h) => h.edit_session_id === vars.editSessionId && h.changed_by === user.id,
+      );
+      if (affected.length === 0) return;
+
+      // Optimistic patch.
+      const prevById = new Map(affected.map((h) => [h.id, h] as const));
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          history: cur.history.map((h) =>
+            prevById.has(h.id) ? { ...h, session_note: vars.note } : h),
+        };
+      });
+
+      // Mark every affected id as inflight BEFORE awaiting.
+      for (const h of affected) markInflight(h.id);
+
+      const { error } = await sb
+        .from("activity_history")
+        .update({ session_note: vars.note })
+        .eq("edit_session_id", vars.editSessionId)
+        .eq("changed_by", user.id);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            history: cur.history.map((h) => prevById.get(h.id) ?? h),
+          };
+        });
+        toast.error(`Session note save failed: ${error.message}`);
+      }
     },
   });
 }

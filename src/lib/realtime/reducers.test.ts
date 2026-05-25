@@ -58,7 +58,7 @@ function makeData(over: Partial<BootstrapData> = {}): BootstrapData {
       critical_float_threshold: 0, comment_visibility_default: "shared" },
     calendars: [], calendarExceptions: [], wbsNodes: [], activities: [],
     dependencies: [], constraints: [], comments: [], history: [],
-    lookaheads: [], lookaheadTasks: [], ...over,
+    lookaheads: [], lookaheadTasks: [], users: {}, ...over,
   };
 }
 
@@ -242,5 +242,39 @@ describe("applyRealtimeEvent — activity_history", () => {
       table: "activity_history", type: "INSERT", new: makeHist({ id: "h1" }),
     });
     expect(next.history.map((h) => h.id)).toEqual(["h1", "h0"]);  // newest first
+  });
+
+  it("activity_history UPDATE replaces the row by id", () => {
+    const original: DbActivityHistory = {
+      id: "h1", project_id: PID, edit_session_id: "es1",
+      entity_type: "activity", entity_id: "a1", field: "name",
+      old_value: "old", new_value: "new",
+      changed_by: "u1", changed_at: "2026-05-24T12:00:00Z",
+      visibility: "internal", session_note: null,
+    };
+    const data: BootstrapData = { ...makeData(), history: [original] };
+    const updated: DbActivityHistory = { ...original, session_note: "re-sequenced concrete" };
+
+    const next = applyRealtimeEvent(data, {
+      table: "activity_history", type: "UPDATE", new: updated,
+    });
+
+    expect(next.history).toHaveLength(1);
+    expect(next.history[0].session_note).toBe("re-sequenced concrete");
+  });
+
+  it("activity_history UPDATE for unknown id is a no-op", () => {
+    const data: BootstrapData = { ...makeData(), history: [] };
+    const updated: DbActivityHistory = {
+      id: "h-missing", project_id: PID, edit_session_id: "es1",
+      entity_type: "activity", entity_id: "a1", field: "name",
+      old_value: "old", new_value: "new",
+      changed_by: "u1", changed_at: "2026-05-24T12:00:00Z",
+      visibility: "internal", session_note: "note",
+    };
+    const next = applyRealtimeEvent(data, {
+      table: "activity_history", type: "UPDATE", new: updated,
+    });
+    expect(next.history).toEqual([]);
   });
 });

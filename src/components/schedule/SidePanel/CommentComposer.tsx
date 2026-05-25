@@ -7,12 +7,13 @@ import { useUiStore } from "@/lib/state/ui-store";
 
 interface Props {
   projectId: string;
+  defaultVisibility: "internal" | "shared";
 }
 
-export function CommentComposer({ projectId }: Props) {
+export function CommentComposer({ projectId, defaultVisibility }: Props) {
   const selectedId = useUiStore((s) => s.selectedActivityId);
   const [body, setBody] = useState("");
-  const [visibility, setVisibility] = useState<"internal" | "shared">("internal");
+  const [visibility, setVisibility] = useState<"internal" | "shared">(defaultVisibility);
   const post = usePostComment(projectId);
 
   async function submit() {

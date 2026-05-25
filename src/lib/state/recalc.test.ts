@@ -54,6 +54,7 @@ function makeBootstrap(overrides: Partial<BootstrapData> = {}): BootstrapData {
     history: [],
     lookaheads: [],
     lookaheadTasks: [],
+    users: {},
     ...overrides,
   };
 }

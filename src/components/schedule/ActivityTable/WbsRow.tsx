@@ -89,6 +89,7 @@ export function WbsRow({ row, expanded, onToggle, indexed, projectId }: Props) {
         />
       ) : (
         <span
+          data-testid="activity-name-cell"
           className="flex-1 truncate"
           onDoubleClick={() => canEdit && setEditingField("name")}
         >

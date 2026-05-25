@@ -38,4 +38,13 @@ describe("useUiStore", () => {
     expect(s.selectedActivityId).toBe("act-1");
     expect(s.filters.criticalOnly).toBe(true);
   });
+
+  it("starts with visibilityFilter = 'all' and setVisibilityFilter updates it", () => {
+    const s = useUiStore.getState();
+    expect(s.visibilityFilter).toBe("all");
+    s.setVisibilityFilter("internal");
+    expect(useUiStore.getState().visibilityFilter).toBe("internal");
+    s.setVisibilityFilter("shared");
+    expect(useUiStore.getState().visibilityFilter).toBe("shared");
+  });
 });
