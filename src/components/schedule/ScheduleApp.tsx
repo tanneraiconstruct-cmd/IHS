@@ -1,16 +1,19 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import type { BootstrapData } from "@/lib/schedule/types";
+import { useProjectChannel } from "@/lib/realtime/use-project-channel";
 import { runRecalc } from "@/lib/state/recalc";
 import { useUiStore } from "@/lib/state/ui-store";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ActivityTable } from "./ActivityTable/ActivityTable";
 import { GanttChart } from "./Gantt/GanttChart";
 import { CalendarView } from "./Calendar/CalendarView";
 import { ListView } from "./List/ListView";
 import { LookaheadView } from "./Lookahead/LookaheadView";
+import { PresenceBar } from "./PresenceBar";
 import { SidePanel } from "./SidePanel/SidePanel";
 import { Toolbar } from "./Toolbar";
 import { Toasts } from "./Toasts";
@@ -27,13 +30,27 @@ export function ScheduleApp({ projectId, bootstrap }: Props) {
     qc.setQueryData(["schedule", projectId], bootstrap);
   }, [qc, projectId, bootstrap]);
 
+  useProjectChannel(projectId);
+
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  useEffect(() => {
+    const sb = createSupabaseBrowserClient();
+    void sb.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUserId(user.id);
+    });
+  }, []);
+
   const view = useUiStore((s) => s.view);
   const mode = useUiStore((s) => s.mode);
   const indexed = useMemo(() => runRecalc(bootstrap), [bootstrap]);
 
   return (
     <div className={clsx("flex h-screen flex-col bg-white", mode === "edit" && "edit-mode")}>
-      <Toolbar projectName={bootstrap.project.name} problems={indexed.problems} />
+      <Toolbar
+        projectName={bootstrap.project.name}
+        problems={indexed.problems}
+        right={<PresenceBar currentUserId={currentUserId} />}
+      />
       <EditModeBanner />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[320px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-hidden">
