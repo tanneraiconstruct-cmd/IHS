@@ -23,7 +23,8 @@ export type RealtimeRowEvent =
   | { table: "comments"; type: "INSERT"; new: DbComment }
   | { table: "comments"; type: "UPDATE"; new: DbComment }
   | { table: "comments"; type: "DELETE"; old: { id: string } }
-  | { table: "activity_history"; type: "INSERT"; new: DbActivityHistory };
+  | { table: "activity_history"; type: "INSERT"; new: DbActivityHistory }
+  | { table: "activity_history"; type: "UPDATE"; new: DbActivityHistory };
 
 export const REALTIME_TABLES = [
   "activities",
