@@ -32,9 +32,9 @@ test("filter, selection, and calendar month survive view switches", async ({ pag
   const nextMonthBtn = page.getByTestId("calendar-next-month");
   await nextMonthBtn.click();
   await nextMonthBtn.click();
+  await expect(monthLabel).not.toHaveText(initialMonth);
 
   const advancedMonth = (await monthLabel.textContent())?.trim() ?? "";
-  expect(advancedMonth).not.toBe(initialMonth);
 
   // Switch to Gantt and back; verify Critical Path is still on.
   await page.getByRole("button", { name: "Gantt" }).click();
