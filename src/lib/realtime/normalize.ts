@@ -36,5 +36,5 @@ export function normalize(
     table: payload.table,
     type: payload.eventType,
     new: row,
-  } as RealtimeRowEvent;
+  } as unknown as RealtimeRowEvent;
 }
