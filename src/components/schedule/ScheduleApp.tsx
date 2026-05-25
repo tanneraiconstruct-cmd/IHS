@@ -10,7 +10,7 @@ import { useUiStore } from "@/lib/state/ui-store";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ActivityTable } from "./ActivityTable/ActivityTable";
 import { GanttChart } from "./Gantt/GanttChart";
-import { CalendarView } from "./Calendar/CalendarView";
+import { CalendarView, monthStartIso } from "./Calendar/CalendarView";
 import { ListView } from "./List/ListView";
 import { LookaheadView } from "./Lookahead/LookaheadView";
 import { PresenceBar } from "./PresenceBar";
@@ -50,6 +50,16 @@ export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
 
   const view = useUiStore((s) => s.view);
   const mode = useUiStore((s) => s.mode);
+
+  const dateAnchor = useUiStore((s) => s.dateAnchor);
+  const setDateAnchor = useUiStore((s) => s.setDateAnchor);
+
+  useEffect(() => {
+    if (dateAnchor === "") {
+      setDateAnchor(monthStartIso(bootstrap.project.project_start));
+    }
+  }, [dateAnchor, setDateAnchor, bootstrap.project.project_start]);
+
   const indexed = useMemo(() => runRecalc(bootstrap), [bootstrap]);
 
   return (
