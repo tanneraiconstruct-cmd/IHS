@@ -4,6 +4,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { markInflight } from "@/lib/realtime/echo-set";
 import type {
   BootstrapData, DbActivity, DbActivityHistory, DbDependency,
+  DbLookahead, DbLookaheadTask,
 } from "@/lib/schedule/types";
 import { runRecalc } from "./recalc";
 import { useUiStore } from "./ui-store";
@@ -37,6 +38,54 @@ export function applyOptimisticDependencyPatch(
     ...data,
     dependencies: data.dependencies.map((d) =>
       d.id === id ? { ...d, ...patch } : d,
+    ),
+  };
+}
+
+export function applyOptimisticLookaheadPatch(
+  data: BootstrapData,
+  id: string,
+  patch: Partial<DbLookahead>,
+): BootstrapData {
+  return {
+    ...data,
+    lookaheads: data.lookaheads.map((l) =>
+      l.id === id ? { ...l, ...patch } : l,
+    ),
+  };
+}
+
+export function applyOptimisticLookaheadTaskPatch(
+  data: BootstrapData,
+  id: string,
+  patch: Partial<DbLookaheadTask>,
+): BootstrapData {
+  return {
+    ...data,
+    lookaheadTasks: data.lookaheadTasks.map((t) =>
+      t.id === id ? { ...t, ...patch } : t,
+    ),
+  };
+}
+
+export function softDeleteFromCache(
+  data: BootstrapData,
+  kind: "lookahead" | "lookaheadTask",
+  id: string,
+  deletedAt: string,
+): BootstrapData {
+  if (kind === "lookahead") {
+    return {
+      ...data,
+      lookaheads: data.lookaheads.map((l) =>
+        l.id === id ? { ...l, deleted_at: deletedAt } : l,
+      ),
+    };
+  }
+  return {
+    ...data,
+    lookaheadTasks: data.lookaheadTasks.map((t) =>
+      t.id === id ? { ...t, deleted_at: deletedAt } : t,
     ),
   };
 }
@@ -585,6 +634,296 @@ export function useSetSessionNote(projectId: string) {
           };
         });
         toast.error(`Session note save failed: ${error.message}`);
+      }
+    },
+  });
+}
+
+// --- Lookahead-level mutations ------------------------------------------
+
+const LOOKAHEAD_SELECT =
+  "id, project_id, name, window_start, window_end, type, source_mode, deleted_at";
+
+export function useCreateLookahead(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["createLookahead", projectId],
+    mutationFn: async (vars: {
+      name: string;
+      windowStart: string;
+      windowEnd: string;
+      type: string | null;
+    }): Promise<{ lookaheadId: string; taskCount: number }> => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) throw new Error("No schedule cache");
+
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) throw new Error("No user");
+
+      // 1. Insert the lookahead.
+      const { data: lookaheadRow, error: insertErr } = await sb
+        .from("lookaheads")
+        .insert({
+          project_id: projectId,
+          name: vars.name,
+          window_start: vars.windowStart,
+          window_end: vars.windowEnd,
+          type: vars.type,
+          source_mode: "from_master",
+          created_by: user.id,
+        })
+        .select(LOOKAHEAD_SELECT)
+        .single();
+
+      if (insertErr || !lookaheadRow) {
+        toast.error(`Couldn't create lookahead: ${insertErr?.message ?? "unknown"}`);
+        throw new Error(insertErr?.message ?? "Insert failed");
+      }
+
+      const newLookahead = lookaheadRow as unknown as DbLookahead;
+
+      // Optimistically add the new lookahead to the cache.
+      qc.setQueryData(["schedule", projectId], (prev: BootstrapData | undefined) => {
+        if (!prev) return prev;
+        return { ...prev, lookaheads: [...prev.lookaheads, newLookahead] };
+      });
+
+      // 2. Compute masters in window and bulk-insert tasks.
+      const { mastersInWindow } = await import("./auto-populate");
+      const indexed = runRecalc(data);
+      const masters = mastersInWindow(data, indexed, vars.windowStart, vars.windowEnd);
+
+      if (masters.length === 0) {
+        return { lookaheadId: newLookahead.id, taskCount: 0 };
+      }
+
+      const taskPayload = masters.map((a) => ({
+        lookahead_id: newLookahead.id,
+        master_activity_id: a.id,
+        name: a.name,
+        offset_start: 0,
+        offset_finish: 0,
+        responsible_company_id: a.responsible_company_id,
+        status: "not_started",
+        percent_complete: a.percent_complete,
+      }));
+
+      const { data: newTaskRows, error: taskErr } = await sb
+        .from("lookahead_tasks")
+        .insert(taskPayload)
+        .select(
+          "id, lookahead_id, master_activity_id, name, offset_start, offset_finish, " +
+          "start_date, finish_date, crew, responsible_company_id, status, " +
+          "percent_complete, constraints_cleared, readiness_notes, deleted_at",
+        );
+
+      if (taskErr) {
+        toast.error("Lookahead created but no tasks loaded — use Re-populate.");
+        return { lookaheadId: newLookahead.id, taskCount: 0 };
+      }
+
+      const newTasks = (newTaskRows ?? []) as unknown as DbLookaheadTask[];
+      qc.setQueryData(["schedule", projectId], (prev: BootstrapData | undefined) => {
+        if (!prev) return prev;
+        return { ...prev, lookaheadTasks: [...prev.lookaheadTasks, ...newTasks] };
+      });
+
+      return { lookaheadId: newLookahead.id, taskCount: newTasks.length };
+    },
+  });
+}
+
+export function useUpdateLookahead(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["updateLookahead", projectId],
+    mutationFn: async (vars: {
+      lookaheadId: string;
+      patch: Partial<Pick<DbLookahead, "name" | "window_start" | "window_end" | "type">>;
+    }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      qc.setQueryData(["schedule", projectId],
+        applyOptimisticLookaheadPatch(data, vars.lookaheadId, vars.patch));
+
+      const { error } = await sb
+        .from("lookaheads")
+        .update(vars.patch)
+        .eq("id", vars.lookaheadId);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], data);
+        toast.error(`Couldn't save: ${error.message}`);
+      }
+    },
+  });
+}
+
+export function useDeleteLookahead(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["deleteLookahead", projectId],
+    mutationFn: async (vars: { lookaheadId: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      const now = new Date().toISOString();
+      qc.setQueryData(["schedule", projectId],
+        softDeleteFromCache(data, "lookahead", vars.lookaheadId, now));
+
+      const { error } = await sb
+        .from("lookaheads")
+        .update({ deleted_at: now })
+        .eq("id", vars.lookaheadId);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], data);
+        toast.error(`Couldn't delete: ${error.message}`);
+      }
+    },
+  });
+}
+
+// --- Lookahead-task-level mutations -------------------------------------
+
+const LOOKAHEAD_TASK_SELECT =
+  "id, lookahead_id, master_activity_id, name, offset_start, offset_finish, " +
+  "start_date, finish_date, crew, responsible_company_id, status, " +
+  "percent_complete, constraints_cleared, readiness_notes, deleted_at";
+
+export function useInsertLookaheadTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["insertLookaheadTask", projectId],
+    mutationFn: async (vars: {
+      lookaheadId: string;
+      masterActivityId: string | null;
+      name: string;
+    }): Promise<DbLookaheadTask | null> => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return null;
+
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) throw new Error("No user");
+
+      // Build defaults based on master-linked vs detached.
+      let payload: Partial<DbLookaheadTask> & { lookahead_id: string };
+      if (vars.masterActivityId) {
+        const master = data.activities.find((a) => a.id === vars.masterActivityId);
+        payload = {
+          lookahead_id: vars.lookaheadId,
+          master_activity_id: vars.masterActivityId,
+          name: vars.name || master?.name || "Untitled",
+          offset_start: 0,
+          offset_finish: 0,
+          start_date: null,
+          finish_date: null,
+          crew: null,
+          responsible_company_id: master?.responsible_company_id ?? null,
+          status: "not_started",
+          percent_complete: 0,
+        };
+      } else {
+        // Detached: need the user's company for the RLS default.
+        const { data: userRow } = await sb
+          .from("users")
+          .select("company_id")
+          .eq("id", user.id)
+          .single();
+        const today = new Date().toISOString().slice(0, 10);
+        payload = {
+          lookahead_id: vars.lookaheadId,
+          master_activity_id: null,
+          name: vars.name || "New task",
+          offset_start: null,
+          offset_finish: null,
+          start_date: today,
+          finish_date: today,
+          crew: null,
+          responsible_company_id: (userRow as { company_id: string } | null)?.company_id ?? null,
+          status: "not_started",
+          percent_complete: 0,
+        };
+      }
+
+      const { data: inserted, error } = await sb
+        .from("lookahead_tasks")
+        .insert(payload)
+        .select(LOOKAHEAD_TASK_SELECT)
+        .single();
+
+      if (error || !inserted) {
+        toast.error(`Couldn't add task: ${error?.message ?? "unknown"}`);
+        return null;
+      }
+
+      const newTask = inserted as unknown as DbLookaheadTask;
+      qc.setQueryData(["schedule", projectId], (prev: BootstrapData | undefined) => {
+        if (!prev) return prev;
+        return { ...prev, lookaheadTasks: [...prev.lookaheadTasks, newTask] };
+      });
+      return newTask;
+    },
+  });
+}
+
+export function useUpdateLookaheadTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["updateLookaheadTask", projectId],
+    mutationFn: async (vars: {
+      taskId: string;
+      patch: Partial<Pick<DbLookaheadTask,
+        "name" | "master_activity_id" | "offset_start" | "offset_finish" |
+        "start_date" | "finish_date" | "crew" | "responsible_company_id" |
+        "status" | "percent_complete">>;
+    }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      qc.setQueryData(["schedule", projectId],
+        applyOptimisticLookaheadTaskPatch(data, vars.taskId, vars.patch));
+
+      const { error } = await sb
+        .from("lookahead_tasks")
+        .update(vars.patch)
+        .eq("id", vars.taskId);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], data);
+        toast.error(`Couldn't save: ${error.message}`);
+      }
+    },
+  });
+}
+
+export function useDeleteLookaheadTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["deleteLookaheadTask", projectId],
+    mutationFn: async (vars: { taskId: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      const now = new Date().toISOString();
+      qc.setQueryData(["schedule", projectId],
+        softDeleteFromCache(data, "lookaheadTask", vars.taskId, now));
+
+      const { error } = await sb
+        .from("lookahead_tasks")
+        .update({ deleted_at: now })
+        .eq("id", vars.taskId);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], data);
+        toast.error(`Couldn't delete: ${error.message}`);
       }
     },
   });

@@ -24,18 +24,20 @@ interface Props {
   bootstrap: BootstrapData;
 }
 
-export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
+export function ScheduleApp({ projectId, bootstrap: bootstrapProp }: Props) {
   const qc = useQueryClient();
+  // Seed the cache once per projectId. After this, mutations are the source of truth.
   useEffect(() => {
-    qc.setQueryData(["schedule", projectId], initialBootstrap);
-  }, [qc, projectId, initialBootstrap]);
+    qc.setQueryData(["schedule", projectId], bootstrapProp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qc, projectId]);
 
-  // Subscribe to the query cache so mutations and realtime updates trigger re-renders.
-  const { data: bootstrap = initialBootstrap } = useQuery<BootstrapData>({
+  // Subscribe to cache updates from mutations. queryFn is never invoked (cache is seeded by the effect above; staleTime: Infinity blocks refetch).
+  const { data: bootstrap = bootstrapProp } = useQuery<BootstrapData>({
     queryKey: ["schedule", projectId],
-    queryFn: () => qc.getQueryData<BootstrapData>(["schedule", projectId]) ?? initialBootstrap,
+    queryFn: () => bootstrapProp,
+    initialData: bootstrapProp,
     staleTime: Infinity,
-    initialData: initialBootstrap,
   });
 
   useProjectChannel(projectId);
@@ -51,6 +53,13 @@ export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
   const view = useUiStore((s) => s.view);
   const mode = useUiStore((s) => s.mode);
   const indexed = useMemo(() => runRecalc(bootstrap), [bootstrap]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    const sb = createSupabaseBrowserClient();
+    sb.from("companies").select("id, name").then((res) => {
+      if (!res.error && res.data) setCompanies(res.data);
+    });
+  }, []);
 
   return (
     <div className={clsx("flex h-screen flex-col bg-white", mode === "edit" && "edit-mode")}>
@@ -68,7 +77,7 @@ export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
           {view === "gantt" && <GanttChart bootstrap={bootstrap} indexed={indexed} projectId={projectId} />}
           {view === "list" && <ListView bootstrap={bootstrap} indexed={indexed} />}
           {view === "calendar" && <CalendarView bootstrap={bootstrap} indexed={indexed} />}
-          {view === "lookahead" && <LookaheadView bootstrap={bootstrap} indexed={indexed} />}
+          {view === "lookahead" && <LookaheadView bootstrap={bootstrap} indexed={indexed} projectId={projectId} companies={companies} />}
         </main>
         <aside className="w-[340px] shrink-0 border-l border-slate-200 bg-slate-50">
           <SidePanel bootstrap={bootstrap} projectId={projectId} />
