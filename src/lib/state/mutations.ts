@@ -301,6 +301,8 @@ export function useInsertDependency(projectId: string) {
       markInflight(data.id);
 
       const sessionId = useUiStore.getState().editSessionId;
+      const cache = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const visibility = cache?.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{
@@ -308,7 +310,7 @@ export function useInsertDependency(projectId: string) {
           oldValue: null, newValue: `${vars.predecessorId}→${vars.successorId} ${vars.type}+${vars.lag}`,
         }],
         sessionId,
-        "shared",
+        visibility,
         user.id,
       );
     },
@@ -339,10 +341,12 @@ export function useDeleteActivity(projectId: string) {
         };
       });
       const sessionId = useUiStore.getState().editSessionId;
+      const cache = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const visibility = cache?.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{ projectId, entityType: "activity", entityId: id, field: "deleted_at", oldValue: null, newValue: now }],
-        sessionId, "shared", user.id,
+        sessionId, visibility, user.id,
       );
     },
   });
@@ -379,10 +383,11 @@ export function useToggleDependencyActive(projectId: string) {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) return;
       const sessionId = useUiStore.getState().editSessionId;
+      const visibility = data.project.comment_visibility_default === "shared" ? "shared" : "internal";
       await insertHistoryRows(
         sb,
         [{ projectId, entityType: "dependency", entityId: id, field: "is_active", oldValue: String(!next), newValue: String(next) }],
-        sessionId, "shared", user.id,
+        sessionId, visibility, user.id,
       );
     },
   });
