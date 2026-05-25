@@ -483,3 +483,54 @@ export function useUpdateComment(projectId: string) {
     },
   });
 }
+
+export function useSoftDeleteComment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["softDeleteComment", projectId],
+    mutationFn: async (vars: { commentId: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const prev = data?.comments.find((c) => c.id === vars.commentId);
+      if (!data || !prev) {
+        toast.error("Comment not in cache");
+        return;
+      }
+
+      const deletedAt = new Date().toISOString();
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) =>
+            c.id === vars.commentId ? { ...c, deleted_at: deletedAt } : c),
+        };
+      });
+      markInflight(vars.commentId);
+
+      const { data: updated, error } = await sb
+        .from("comments")
+        .update({ deleted_at: deletedAt })
+        .eq("id", vars.commentId)
+        .select("id, project_id, author_user_id, body, parent_comment_id, scope, target_activity_id, visibility, created_at, edited_at, deleted_at")
+        .single();
+
+      if (error || !updated) {
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return { ...cur, comments: cur.comments.map((c) => c.id === vars.commentId ? prev : c) };
+        });
+        toast.error(`Comment delete failed: ${error?.message ?? "unknown"}`);
+        return;
+      }
+
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) => c.id === vars.commentId ? (updated as unknown as typeof c) : c),
+        };
+      });
+    },
+  });
+}
