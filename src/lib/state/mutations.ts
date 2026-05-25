@@ -215,21 +215,28 @@ export function useSaveActivity(projectId: string) {
         }
       }
 
-      // Best-effort cascade writes (no version check). See plan §Concurrency model.
+      // Cascade writes: per-row update that bumps version so realtime receivers accept the event.
       if (cascadeUpdates.length > 0) {
-        const payload = cascadeUpdates.map((a) => ({
-          id: a.id,
-          planned_start: a.planned_start,
-          planned_finish: a.planned_finish,
-          early_start: a.early_start,
-          early_finish: a.early_finish,
-          late_start: a.late_start,
-          late_finish: a.late_finish,
-          total_float: a.total_float,
-          free_float: a.free_float,
-          is_critical: a.is_critical,
-        }));
-        const { error: cascadeErr } = await sb.from("activities").upsert(payload);
+        const results = await Promise.all(
+          cascadeUpdates.map((a) =>
+            sb
+              .from("activities")
+              .update({
+                planned_start: a.planned_start,
+                planned_finish: a.planned_finish,
+                early_start: a.early_start,
+                early_finish: a.early_finish,
+                late_start: a.late_start,
+                late_finish: a.late_finish,
+                total_float: a.total_float,
+                free_float: a.free_float,
+                is_critical: a.is_critical,
+                version: a.version + 1,
+              })
+              .eq("id", a.id),
+          ),
+        );
+        const cascadeErr = results.find((r) => r.error)?.error;
         if (cascadeErr) toast.warn(`Cascade write failed: ${cascadeErr.message}`);
       }
 
