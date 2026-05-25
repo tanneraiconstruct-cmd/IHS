@@ -534,3 +534,53 @@ export function useSoftDeleteComment(projectId: string) {
     },
   });
 }
+
+export function useSetSessionNote(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["setSessionNote", projectId],
+    mutationFn: async (vars: { editSessionId: string; note: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) throw new Error("No user");
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      if (!data) return;
+
+      const affected = data.history.filter(
+        (h) => h.edit_session_id === vars.editSessionId && h.changed_by === user.id,
+      );
+      if (affected.length === 0) return;
+
+      // Optimistic patch.
+      const prevById = new Map(affected.map((h) => [h.id, h] as const));
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          history: cur.history.map((h) =>
+            prevById.has(h.id) ? { ...h, session_note: vars.note } : h),
+        };
+      });
+
+      // Mark every affected id as inflight BEFORE awaiting.
+      for (const h of affected) markInflight(h.id);
+
+      const { error } = await sb
+        .from("activity_history")
+        .update({ session_note: vars.note })
+        .eq("edit_session_id", vars.editSessionId)
+        .eq("changed_by", user.id);
+
+      if (error) {
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            history: cur.history.map((h) => prevById.get(h.id) ?? h),
+          };
+        });
+        toast.error(`Session note save failed: ${error.message}`);
+      }
+    },
+  });
+}
