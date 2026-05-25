@@ -2,7 +2,7 @@
 
 import { clsx } from "clsx";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { BootstrapData, IndexedResult } from "@/lib/schedule/types";
 import { useUiStore } from "@/lib/state/ui-store";
 
@@ -20,11 +20,17 @@ function isoOf(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+export function monthStartIso(iso: string): string {
+  return isoOf(startOfMonthUtc(iso));
+}
+
 export function CalendarView({ bootstrap, indexed }: Props) {
-  const [anchor, setAnchor] = useState(() => startOfMonthUtc(bootstrap.project.project_start));
+  const dateAnchorIso = useUiStore((s) => s.dateAnchor);
+  const setDateAnchor = useUiStore((s) => s.setDateAnchor);
   const select = useUiStore((s) => s.select);
   const selectedId = useUiStore((s) => s.selectedActivityId);
   const criticalOnly = useUiStore((s) => s.filters.criticalOnly);
+  const anchor = startOfMonthUtc(dateAnchorIso || bootstrap.project.project_start);
 
   const monthLabel = anchor.toLocaleDateString("en-US", {
     month: "long", year: "numeric", timeZone: "UTC",
@@ -67,24 +73,35 @@ export function CalendarView({ bootstrap, indexed }: Props) {
   function move(months: number) {
     const next = new Date(anchor);
     next.setUTCMonth(next.getUTCMonth() + months);
-    setAnchor(next);
+    setDateAnchor(isoOf(next));
   }
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-        <div className="text-sm font-medium">{monthLabel}</div>
+        <div data-testid="calendar-month-label" className="text-sm font-medium">{monthLabel}</div>
         <div className="flex items-center gap-1">
-          <button onClick={() => move(-1)} className="rounded p-1 hover:bg-slate-100">
+          <button
+            data-testid="calendar-prev-month"
+            onClick={() => move(-1)}
+            className="rounded p-1 hover:bg-slate-100"
+          >
             <ChevronLeft size={16} />
           </button>
           <button
-            onClick={() => setAnchor(startOfMonthUtc(bootstrap.project.project_start))}
+            data-testid="calendar-today"
+            onClick={() =>
+              setDateAnchor(monthStartIso(bootstrap.project.project_start))
+            }
             className="rounded px-2 py-1 text-xs hover:bg-slate-100"
           >
             Today
           </button>
-          <button onClick={() => move(1)} className="rounded p-1 hover:bg-slate-100">
+          <button
+            data-testid="calendar-next-month"
+            onClick={() => move(1)}
+            className="rounded p-1 hover:bg-slate-100"
+          >
             <ChevronRight size={16} />
           </button>
         </div>

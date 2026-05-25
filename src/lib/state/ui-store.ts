@@ -19,6 +19,7 @@ interface UiState {
   editSessionId: string | null;
   filters: Filters;
   visibilityFilter: VisibilityFilter;
+  dateAnchor: string;
 }
 
 interface UiActions {
@@ -29,6 +30,7 @@ interface UiActions {
   exitEditMode: () => void;
   setFilter: <K extends keyof Filters>(key: K, value: Filters[K]) => void;
   setVisibilityFilter: (v: VisibilityFilter) => void;
+  setDateAnchor: (iso: string) => void;
 }
 
 const initialState: UiState = {
@@ -39,6 +41,7 @@ const initialState: UiState = {
   editSessionId: null,
   filters: { criticalOnly: false, trade: null, responsibleCompanyId: null },
   visibilityFilter: "all",
+  dateAnchor: "",
 };
 
 export const useUiStore = create<UiState & UiActions>((set) => ({
@@ -52,6 +55,7 @@ export const useUiStore = create<UiState & UiActions>((set) => ({
   setFilter: (key, value) =>
     set((s) => ({ filters: { ...s.filters, [key]: value } })),
   setVisibilityFilter: (v) => set({ visibilityFilter: v }),
+  setDateAnchor: (iso) => set({ dateAnchor: iso }),
 }));
 
 // Expose the initial state for test resets.
