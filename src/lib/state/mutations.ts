@@ -425,3 +425,60 @@ export function usePostComment(projectId: string) {
     },
   });
 }
+
+export function useUpdateComment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["updateComment", projectId],
+    mutationFn: async (vars: { commentId: string; body: string }) => {
+      const sb = createSupabaseBrowserClient();
+      const data = qc.getQueryData<BootstrapData>(["schedule", projectId]);
+      const prev = data?.comments.find((c) => c.id === vars.commentId);
+      if (!data || !prev) {
+        toast.error("Comment not in cache");
+        return;
+      }
+
+      // Optimistic patch.
+      const optimisticEditedAt = new Date().toISOString();
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) =>
+            c.id === vars.commentId ? { ...c, body: vars.body, edited_at: optimisticEditedAt } : c),
+        };
+      });
+
+      const { data: updated, error } = await sb
+        .from("comments")
+        .update({ body: vars.body, edited_at: new Date().toISOString() })
+        .eq("id", vars.commentId)
+        .select("id, project_id, author_user_id, body, parent_comment_id, scope, target_activity_id, visibility, created_at, edited_at, deleted_at")
+        .single();
+
+      if (error || !updated) {
+        // Rollback.
+        qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+          if (!cur) return cur;
+          return {
+            ...cur,
+            comments: cur.comments.map((c) => c.id === vars.commentId ? prev : c),
+          };
+        });
+        toast.error(`Comment edit failed: ${error?.message ?? "unknown"}`);
+        return;
+      }
+
+      // Replace with authoritative row + mark echo.
+      qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
+        if (!cur) return cur;
+        return {
+          ...cur,
+          comments: cur.comments.map((c) => c.id === vars.commentId ? (updated as unknown as typeof c) : c),
+        };
+      });
+      markInflight(updated.id);
+    },
+  });
+}
