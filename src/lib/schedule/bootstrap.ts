@@ -60,7 +60,8 @@ export async function fetchBootstrap(
       .eq("project_id", projectId),
     supabase
       .from("activity_constraints")
-      .select("id, activity_id, type, constraint_date"),
+      .select("id, project_id, activity_id, type, constraint_date")
+      .eq("project_id", projectId),
     supabase
       .from("comments")
       .select(
