@@ -26,8 +26,9 @@ This spec therefore defines the **minimum** changes needed to close the gap betw
 ## 1. Goals
 
 1. The visible date window in `CalendarView` survives a view switch (today it lives in component-local `useState` and resets to project start on every remount).
-2. `selectedActivityId` is visually indicated in **every** main view. `ListView` and `CalendarView` already do this; `GanttChart` / `GanttBar` currently do not.
-3. An end-to-end test asserts that filter + selection + calendar anchor all persist across `Gantt → Calendar → Gantt → List → Calendar` round-trips.
+2. An end-to-end test asserts that filter + selection + calendar anchor all persist across `Gantt → Calendar → Gantt → List → Calendar` round-trips.
+
+**Revision note (post-commit):** `GanttBar.tsx` already reads `selectedActivityId` from `ui-store` and applies `ring-2 ring-sky-400` when selected (see `GanttBar.tsx:21,26,129,159`). The original spec listed Gantt-selection highlighting as a goal; it is in fact already satisfied. Goal removed.
 
 Non-goals (explicitly deferred):
 
@@ -119,11 +120,9 @@ function move(months: number) {
 
 The "Today" button (still inside the calendar header for now) calls `setDateAnchor(monthStartIso(bootstrap.project.project_start))`.
 
-### 2.4 Gantt selection highlight
+### 2.4 Gantt selection highlight — already done
 
-`GanttChart` does not currently consume `selectedActivityId`. The fix is purely visual: `GanttBar.tsx` reads `selectedActivityId` from `ui-store` and applies a visible ring when `activity.id === selectedActivityId` (concretely: `ring-2 ring-sky-400` layered on the existing bar classes — same `selectedActivityId` styling vocabulary already used in `ListView` / `CalendarView`).
-
-Click-to-select is already wired in `GanttBar` (it calls `select(activity.id)` on `onClick` of both the bar variants — confirmed at spec time). No handler changes needed. No store changes are needed for this — `select` and `selectedActivityId` already exist.
+`GanttBar.tsx` (lines 21, 26, 129, 159) already reads `selectedActivityId` and applies `ring-2 ring-sky-400` when the bar's activity is selected, including the milestone variant. No work needed.
 
 ### 2.5 Gantt is **not** scroll-driven by `dateAnchor` in Phase 8
 
@@ -139,10 +138,9 @@ The "Done when" criterion says "renders the same data," not "scrolls to the same
 | `src/lib/state/ui-store.test.ts`                             | Add unit test for `setDateAnchor` and initial-state default.        |
 | `src/components/schedule/ScheduleApp.tsx`                    | Hydration effect: seed `dateAnchor` from `project.project_start`.  |
 | `src/components/schedule/Calendar/CalendarView.tsx`          | Replace local `anchor` `useState` with store-backed value + setter. |
-| `src/components/schedule/Gantt/GanttBar.tsx`                 | Read `selectedActivityId`; apply `ring-2 ring-sky-400` when selected. (Click already calls `select()`.) |
 | `tests/e2e/view-switcher-persistence.spec.ts` *(new)*        | E2E persistence test (§4).                                          |
 
-Estimated diff size: ~120–150 LOC (excluding the e2e test).
+Estimated diff size: ~60–90 LOC (excluding the e2e test). `GanttBar` selection highlight is already implemented and not modified.
 
 ---
 
@@ -191,7 +189,6 @@ This phase is pure client state — no DB schema, no RPC, no realtime payload ch
 - [ ] `ui-store` exposes `dateAnchor: string` and `setDateAnchor(iso)`.
 - [ ] `ScheduleApp` seeds `dateAnchor` once from `project.project_start`.
 - [ ] `CalendarView` reads from / writes to `ui-store.dateAnchor`; no local `anchor` state.
-- [ ] `GanttBar` shows a selection ring matching List/Calendar styling.
 - [ ] `vitest` unit test covers the new store field/action.
 - [ ] New `playwright` e2e test covers filter + selection + calendar anchor persistence across all view-switch permutations exercised in §4.2.
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e` all pass.
