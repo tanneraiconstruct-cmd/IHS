@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { markInflight } from "@/lib/realtime/echo-set";
 import type {
   BootstrapData, DbActivity, DbActivityHistory, DbDependency,
 } from "@/lib/schedule/types";
@@ -297,6 +298,7 @@ export function useInsertDependency(projectId: string) {
         if (!prev) return prev;
         return { ...prev, dependencies: [...prev.dependencies, data as unknown as DbDependency] };
       });
+      markInflight(data.id);
 
       const sessionId = useUiStore.getState().editSessionId;
       await insertHistoryRows(
@@ -419,6 +421,7 @@ export function usePostComment(projectId: string) {
         if (!prev) return prev;
         return { ...prev, comments: [data as never, ...prev.comments] };
       });
+      markInflight(data.id);
     },
   });
 }
