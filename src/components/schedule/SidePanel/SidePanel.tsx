@@ -68,6 +68,8 @@ export function SidePanel({ bootstrap, projectId }: Props) {
       } else {
         const sorted = [...rows].sort((a, b) => a.changed_at.localeCompare(b.changed_at));
         const head = sorted[0];
+        // All rows in one edit_session_id are written together by insertHistoryRows
+        // with a single visibility value, so head.visibility represents the group.
         historyEntries.push({
           kind: "history-group", rows: sorted, at: head.changed_at,
           visibility: head.visibility, authorId: head.changed_by,

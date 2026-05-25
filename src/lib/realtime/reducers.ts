@@ -150,6 +150,9 @@ function reduceHistory(
     return { ...data, history: [event.new, ...data.history] };
   }
   // UPDATE — replace by id; no-op if absent (late-bind or echo).
+  // No consumeEcho() here: the optimistic patch in useSetSessionNote already
+  // holds the same session_note value the server returns, so accepting the
+  // authoritative row is safe (and idempotent on the actor's machine).
   const idx = data.history.findIndex((h) => h.id === event.new.id);
   if (idx === -1) return data;
   const next = [...data.history];
