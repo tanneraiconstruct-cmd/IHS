@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import type { BootstrapData } from "@/lib/schedule/types";
@@ -24,11 +24,19 @@ interface Props {
   bootstrap: BootstrapData;
 }
 
-export function ScheduleApp({ projectId, bootstrap }: Props) {
+export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
   const qc = useQueryClient();
   useEffect(() => {
-    qc.setQueryData(["schedule", projectId], bootstrap);
-  }, [qc, projectId, bootstrap]);
+    qc.setQueryData(["schedule", projectId], initialBootstrap);
+  }, [qc, projectId, initialBootstrap]);
+
+  // Subscribe to the query cache so mutations and realtime updates trigger re-renders.
+  const { data: bootstrap = initialBootstrap } = useQuery<BootstrapData>({
+    queryKey: ["schedule", projectId],
+    queryFn: () => qc.getQueryData<BootstrapData>(["schedule", projectId]) ?? initialBootstrap,
+    staleTime: Infinity,
+    initialData: initialBootstrap,
+  });
 
   useProjectChannel(projectId);
 
