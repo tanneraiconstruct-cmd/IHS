@@ -439,20 +439,22 @@ export function useUpdateComment(projectId: string) {
         return;
       }
 
+      const editedAt = new Date().toISOString();
+
       // Optimistic patch.
-      const optimisticEditedAt = new Date().toISOString();
       qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
         if (!cur) return cur;
         return {
           ...cur,
           comments: cur.comments.map((c) =>
-            c.id === vars.commentId ? { ...c, body: vars.body, edited_at: optimisticEditedAt } : c),
+            c.id === vars.commentId ? { ...c, body: vars.body, edited_at: editedAt } : c),
         };
       });
+      markInflight(vars.commentId);
 
       const { data: updated, error } = await sb
         .from("comments")
-        .update({ body: vars.body, edited_at: new Date().toISOString() })
+        .update({ body: vars.body, edited_at: editedAt })
         .eq("id", vars.commentId)
         .select("id, project_id, author_user_id, body, parent_comment_id, scope, target_activity_id, visibility, created_at, edited_at, deleted_at")
         .single();
@@ -470,7 +472,7 @@ export function useUpdateComment(projectId: string) {
         return;
       }
 
-      // Replace with authoritative row + mark echo.
+      // Replace with authoritative row.
       qc.setQueryData(["schedule", projectId], (cur: BootstrapData | undefined) => {
         if (!cur) return cur;
         return {
@@ -478,7 +480,6 @@ export function useUpdateComment(projectId: string) {
           comments: cur.comments.map((c) => c.id === vars.commentId ? (updated as unknown as typeof c) : c),
         };
       });
-      markInflight(updated.id);
     },
   });
 }
