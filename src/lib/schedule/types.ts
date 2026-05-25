@@ -138,6 +138,13 @@ export interface DbProject {
   comment_visibility_default: "internal" | "shared";
 }
 
+export interface UserLookupEntry {
+  id: string;
+  display_name: string;   // mapped from users.full_name in bootstrap
+  company_id: string;
+  color: string;          // hex from deriveColor(id); pre-computed
+}
+
 export interface BootstrapData {
   project: DbProject;
   calendars: DbCalendar[];
@@ -150,6 +157,7 @@ export interface BootstrapData {
   history: DbActivityHistory[];
   lookaheads: DbLookahead[];
   lookaheadTasks: DbLookaheadTask[];
+  users: Record<string, UserLookupEntry>;
 }
 
 /** Engine-computed result keyed for fast UI lookup. */
