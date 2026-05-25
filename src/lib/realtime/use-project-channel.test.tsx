@@ -75,7 +75,7 @@ function seed(qc: QueryClient): BootstrapData {
       critical_float_threshold: 0, comment_visibility_default: "shared" },
     calendars: [], calendarExceptions: [], wbsNodes: [], activities: [],
     dependencies: [], constraints: [], comments: [], history: [],
-    lookaheads: [], lookaheadTasks: [],
+    lookaheads: [], lookaheadTasks: [], users: {},
   };
   qc.setQueryData(["schedule", PID], data);
   return data;

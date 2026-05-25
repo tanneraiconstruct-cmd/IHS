@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { deriveColor } from "@/lib/realtime/presence";
 import type {
   BootstrapData,
   DbActivity,
@@ -13,6 +14,25 @@ import type {
   DbProject,
   DbWbsNode,
 } from "./types";
+
+interface UserRow {
+  id: string;
+  company_id: string;
+  full_name: string;
+}
+
+export function buildUserLookup(rows: UserRow[]): Record<string, import("./types").UserLookupEntry> {
+  const out: Record<string, import("./types").UserLookupEntry> = {};
+  for (const r of rows) {
+    out[r.id] = {
+      id: r.id,
+      display_name: r.full_name,
+      company_id: r.company_id,
+      color: deriveColor(r.id),
+    };
+  }
+  return out;
+}
 
 const ACTIVITY_FIELDS =
   "id, project_id, wbs_node_id, name, activity_type, original_duration, remaining_duration, " +
@@ -35,6 +55,7 @@ export async function fetchBootstrap(
     historyRes,
     lookaheadsRes,
     lookaheadTasksRes,
+    usersRes,
   ] = await Promise.all([
     supabase
       .from("projects")
@@ -87,6 +108,7 @@ export async function fetchBootstrap(
       .select(
         "id, lookahead_id, master_activity_id, name, offset_start, offset_finish, start_date, finish_date, crew, responsible_company_id, status, percent_complete, constraints_cleared, readiness_notes, deleted_at",
       ),
+    supabase.from("users").select("id, company_id, full_name"),
   ]);
 
   for (const r of [
@@ -100,6 +122,7 @@ export async function fetchBootstrap(
     historyRes,
     lookaheadsRes,
     lookaheadTasksRes,
+    usersRes,
   ]) {
     if (r.error) throw r.error;
   }
@@ -128,5 +151,6 @@ export async function fetchBootstrap(
     history: (historyRes.data ?? []) as unknown as DbActivityHistory[],
     lookaheads: (lookaheadsRes.data ?? []) as unknown as DbLookahead[],
     lookaheadTasks: (lookaheadTasksRes.data ?? []) as unknown as DbLookaheadTask[],
+    users: buildUserLookup((usersRes.data ?? []) as unknown as UserRow[]),
   };
 }

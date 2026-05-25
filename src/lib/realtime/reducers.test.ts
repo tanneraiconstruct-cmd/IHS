@@ -58,7 +58,7 @@ function makeData(over: Partial<BootstrapData> = {}): BootstrapData {
       critical_float_threshold: 0, comment_visibility_default: "shared" },
     calendars: [], calendarExceptions: [], wbsNodes: [], activities: [],
     dependencies: [], constraints: [], comments: [], history: [],
-    lookaheads: [], lookaheadTasks: [], ...over,
+    lookaheads: [], lookaheadTasks: [], users: {}, ...over,
   };
 }
 
