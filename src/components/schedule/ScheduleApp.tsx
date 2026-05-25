@@ -59,7 +59,7 @@ export function ScheduleApp({ projectId, bootstrap: initialBootstrap }: Props) {
         problems={indexed.problems}
         right={<PresenceBar currentUserId={currentUserId} />}
       />
-      <EditModeBanner />
+      <EditModeBanner projectId={projectId} />
       <div className="flex flex-1 overflow-hidden">
         <aside className="w-[320px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-hidden">
           <ActivityTable bootstrap={bootstrap} indexed={indexed} projectId={projectId} />
