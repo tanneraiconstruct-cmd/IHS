@@ -165,6 +165,16 @@ Prints the public hostname.
 
 ---
 
+## Discovered constraints (during implementation, 2026-05-26)
+
+**Next 16 `proxy.ts` is incompatible with `@opennextjs/cloudflare`.** Next 16 renamed the `middleware.ts` file convention to `proxy.ts` and made it default to Node.js runtime — and Next 16's SWC compiler now rejects `runtime: 'edge'` config inside proxy files. OpenNext Cloudflare only supports Edge-runtime middleware. The OpenNext maintainer has confirmed ([opennextjs-cloudflare#1213](https://github.com/opennextjs/opennextjs-cloudflare/issues/1213)) that Node.js-runtime proxy support will NOT be added to this repo — it will arrive via the future Next.js Adapter API instead.
+
+**Workaround applied:** keep the legacy `src/middleware.ts` file convention (instead of Next 16's `src/proxy.ts`) with `runtime: "experimental-edge"` in the exported `config`. The function body is unchanged — it was already Edge-compatible (uses `next/server`, `@supabase/ssr` cookie helpers, no Node-only APIs). Only the file name, exported function name (`proxy` → `middleware`), and the runtime declaration change.
+
+**When to revert:** once `@opennextjs/cloudflare` (or its successor adapter implementing the official Next.js Adapter API) supports the Next 16 `proxy.ts` file convention, rename `src/middleware.ts` back to `src/proxy.ts`, rename the function back, and drop the `runtime` config. Track via the OpenNext repo.
+
+---
+
 ## Risks & Mitigations
 
 | Risk | Mitigation |
@@ -173,9 +183,10 @@ Prints the public hostname.
 | Workers Builds env-var misconfig produces silent runtime failures | Ordering: (1) validate locally with `npm run preview`; (2) do the first production deploy manually via `npm run deploy` from your laptop to confirm the Worker + bindings work; (3) then connect Workers Builds so subsequent pushes auto-deploy. |
 | OpenNext build artifact size pushes past Worker size limits | Workers paid plan ceiling is 10 MB compressed; current app well under. Monitor in dashboard after first deploy. |
 | Production deploys via Workers Builds bypass local lint/typecheck/test | Existing GitHub Actions CI for lint/typecheck/test continues to run on PRs; Workers Builds only deploys, not gates. Future hardening: add a status-check requirement. |
+| Using deprecated `middleware.ts` file convention (see Discovered constraints) | Re-evaluate quarterly. When OpenNext supports Next 16 `proxy.ts`, migrate back — small mechanical rename. |
 
 ---
 
 ## Out of Scope (for the implementation plan)
 
-The implementation plan will cover: install deps, write `wrangler.jsonc` + `open-next.config.ts`, update `package.json`, update `.gitignore`, scrub Vercel from docs/README, write `docs/cloudflare-tunnel.md`, and validate `npm run preview` locally. **Manual steps** (CF dashboard wiring, `cloudflared` install + login + tunnel create on your Mac, first production deploy) will be called out explicitly as "you do this, not me" tasks in the plan.
+The implementation plan covers: install deps, write `wrangler.jsonc` + `open-next.config.ts`, update `package.json`, update `.gitignore`, **convert `src/proxy.ts` back to `src/middleware.ts` with `experimental-edge` runtime (T4.5, added after discovery)**, scrub Vercel from docs/README, write `docs/cloudflare-tunnel.md`, and validate `npm run preview` locally. **Manual steps** (CF dashboard wiring, `cloudflared` install + login + tunnel create on your Mac, first production deploy) will be called out explicitly as "you do this, not me" tasks in the plan.

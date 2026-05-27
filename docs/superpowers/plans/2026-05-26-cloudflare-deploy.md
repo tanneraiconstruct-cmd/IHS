@@ -295,6 +295,113 @@ EOF
 
 ---
 
+## Task 4.5 — Convert `src/proxy.ts` back to `src/middleware.ts` (OpenNext compatibility)
+
+> **Added 2026-05-26 after discovery during T5 validation.** `@opennextjs/cloudflare` does not support Next 16's `proxy.ts` (Node-runtime middleware) and the maintainer has stated it won't be added — full context in the design spec's "Discovered constraints" section and in [opennextjs-cloudflare#1213](https://github.com/opennextjs/opennextjs-cloudflare/issues/1213). Workaround: keep using the legacy `middleware.ts` filename + function name + `experimental-edge` runtime. The existing function body is already Edge-compatible; only file/function name + a one-line config addition change.
+
+**Files:**
+- Rename: `src/proxy.ts` → `src/middleware.ts`
+- Modify (inside the renamed file): function name `proxy` → `middleware`; add `runtime: "experimental-edge"` to the exported `config`
+
+- [ ] **Step 1: Confirm no source code in the repo imports from `src/proxy.ts`**
+
+Next.js loads middleware/proxy files by filename, not by import — but double-check there are no manual imports anywhere:
+
+```bash
+grep -rn "from.*['\"].*proxy['\"]" src tests 2>/dev/null | grep -v node_modules | grep -v ".next/"
+grep -rn "import.*proxy.*from.*['\"]" src tests 2>/dev/null | grep -v node_modules | grep -v ".next/"
+```
+
+Expected: no matches. (The `e2e` tests and source code don't import the proxy function; they only observe its redirect behavior via HTTP.)
+
+If matches appear, STOP and report — those imports would break with the rename.
+
+- [ ] **Step 2: Move the file with `git mv`** (preserves history)
+
+```bash
+git mv src/proxy.ts src/middleware.ts
+```
+
+- [ ] **Step 3: Update the file contents**
+
+Open `src/middleware.ts` (the file you just renamed). It currently reads (relevant parts):
+
+```ts
+export async function proxy(request: NextRequest) {
+  // ... body unchanged ...
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};
+```
+
+Make exactly TWO changes:
+
+1. Rename the exported function from `proxy` to `middleware`:
+   ```ts
+   export async function middleware(request: NextRequest) {
+   ```
+
+2. Add `runtime: "experimental-edge"` as the FIRST key inside the `config` object:
+   ```ts
+   export const config = {
+     runtime: "experimental-edge",
+     matcher: [
+       "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+     ],
+   };
+   ```
+
+Do NOT modify the function body. The Supabase auth logic, cookie handling, and redirect logic are already Edge-compatible.
+
+- [ ] **Step 4: Verify the diff**
+
+```bash
+git diff --cached -- src/middleware.ts
+git status
+```
+
+Expected: `src/proxy.ts` shown as deleted, `src/middleware.ts` shown as new with the two modifications. (Git may also detect this as a rename with modifications, which is fine — `git log --follow` will track history through the rename.)
+
+- [ ] **Step 5: Run unit tests and lint** to confirm nothing broke
+
+```bash
+npm test 2>&1 | tail -5
+npm run lint 2>&1 | tail -5
+npm run typecheck 2>&1 | tail -5
+```
+
+Expected: all green. (No tests directly import the proxy function; e2e tests observe HTTP behavior only.)
+
+- [ ] **Step 6: Stage and commit**
+
+```bash
+git add src/proxy.ts src/middleware.ts
+git commit -m "$(cat <<'EOF'
+fix(middleware): use legacy filename + experimental-edge runtime
+
+@opennextjs/cloudflare does not support Next 16's proxy.ts (Node-runtime
+middleware). Maintainer confirmed it will arrive via the future Next
+Adapter API, not in this repo. Workaround: keep middleware.ts filename
+and declare runtime: "experimental-edge". Function body unchanged
+(was already Edge-compatible).
+
+Refs opennextjs-cloudflare#1213.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+- [ ] **Step 7: Self-review**
+
+`git show HEAD --stat` should show exactly two files: `src/proxy.ts` deleted, `src/middleware.ts` added (or git may show it as one rename + modify). Commit message includes the issue ref and co-author trailer.
+
+---
+
 ## Task 5 — Validate local Workers preview build (verification gate, no commit)
 
 **Why a separate task:** If the OpenNext build or the Workers runtime can't load this app, every later step is wasted work. Verify before scrubbing docs.
