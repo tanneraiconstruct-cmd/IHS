@@ -47,24 +47,24 @@
 
 ### Tech Stack (confirmed)
 
-**Next.js (React + TypeScript) on Vercel · Supabase (Postgres + Auth + Realtime + RLS + Storage) · GitHub (repo + CI/CD)**
+**Next.js (React + TypeScript) on Cloudflare Workers · Supabase (Postgres + Auth + Realtime + RLS + Storage) · GitHub (repo + CI/CD)**
 
 | Concern | Owned by | Notes |
 |---|---|---|
 | UI / rendering | Next.js + React (TS) | Gantt, list, calendar, lookahead views |
-| Backend logic | Next.js server actions / route handlers (on Vercel) | Validation, orchestration, runs the CPM engine authoritatively |
+| Backend logic | Next.js server actions / route handlers (on Cloudflare Workers via @opennextjs/cloudflare) | Validation, orchestration, runs the CPM engine authoritatively |
 | Database | Supabase Postgres | Relational schedule data; recursive queries for dependency chains |
 | Auth | Supabase Auth | Users, sessions, JWTs; internal + external login flows |
 | Permissions | Supabase Row Level Security (RLS) | Row-level enforcement — replaces hand-rolled API guards |
 | Real-time collaboration | Supabase Realtime | Streams Postgres changes to connected clients |
 | File storage | Supabase Storage | Attachments, imported schedule files |
-| CI/CD | GitHub → Vercel | Preview deploys per PR, prod on merge to main |
+| CI/CD | GitHub → Cloudflare Workers Builds | Preview deploys per PR, prod on merge to main |
 | Gantt rendering | TBD in Section 6 | Build-vs-buy decision (e.g., dhtmlx-gantt / frappe-gantt / svar-gantt / custom SVG-Canvas) |
 
 ### The CPM Engine placement
 
 - The **CPM engine is a pure, framework-agnostic TypeScript module** in the repo — deterministic, stateless, independently testable, and **shared between client and server**.
-- **Authoritative recalculation** runs in a Next.js server action / route handler on Vercel.
+- **Authoritative recalculation** runs in a Next.js server action / route handler on Cloudflare Workers.
 - The **client runs the same engine locally** for instant optimistic preview, then reconciles with the authoritative server result.
 - **Watch-item:** very large schedules (thousands of activities) could approach serverless function time limits. Escape hatch: Supabase Edge Function or dedicated recalc endpoint. Not a v1 concern.
 
@@ -735,7 +735,7 @@ Engine recalc + row writes happen in **one Postgres transaction** (via a Supabas
 
 > The order to build in Claude Code. Each phase lists its goal, what it depends on, and a "done when" check. **MVP cut line noted at Phase 9.**
 
-**Phase 0 — Project setup.** Next.js + TypeScript repo on GitHub; Supabase project; Vercel deploy from main; Supabase Auth scaffolding (internal login first). *Done when:* a deployed "hello" app authenticates a user.
+**Phase 0 — Project setup.** Next.js + TypeScript repo on GitHub; Supabase project; Cloudflare Workers deploy from main (via @opennextjs/cloudflare); Supabase Auth scaffolding (internal login first). *Done when:* a deployed "hello" app authenticates a user.
 
 **Phase 1 — CPM engine in isolation (do this first).** Build the pure `schedule-engine/` module (Section 3) with full test suite, **no UI/DB**. **Day-based granularity (confirmed)** — build the calendar helpers around a generic "working-unit" so hour-based can be added later. *Done when:* golden-master + property tests pass for all four relationship types, lags, constraints, calendars, and progress/data-date.
 

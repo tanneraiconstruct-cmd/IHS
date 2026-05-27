@@ -1,5 +1,7 @@
 # Next.js Project Scaffold (Phase 0) Implementation Plan
 
+> **⚠️ Superseded for hosting choice:** This plan's Task 8 (Vercel auto-deploy) is no longer current. The project now deploys to Cloudflare Workers via `@opennextjs/cloudflare`. See `docs/superpowers/specs/2026-05-26-cloudflare-deploy-design.md` and `docs/superpowers/plans/2026-05-26-cloudflare-deploy.md`. The rest of the Phase 0 plan (scaffold, lint, test, CI) is still accurate as historical context for what was built.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Scaffold a buildable, tested, CI-wired Next.js + TypeScript application as the foundation for the IHS construction scheduling tool.
